@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Day's Flight Schedule V6 (15-Oct-2026): flight date + per-airport local times (airport-tz.json); based on V5 -->
+<!-- Day's Flight Schedule V6.2 (19-Oct-2026): box-1 buttons moved to the title row. V6 (15-Oct-2026): flight date + per-airport local times (airport-tz.json); based on V5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -96,17 +96,15 @@
   .seg button:last-child{ border-right:0; }
   .seg button.on{ background:rgba(245,166,35,0.15); color:var(--amber); }
   .seg button:focus-visible{ outline:2px solid var(--amber); outline-offset:-2px; }
-  /* box 1: leg count, then the "plan around" picker, then the two buttons stacked at the right edge */
-  /* V6.1: one row (legs | plan around + date | buttons) when there's room; compact controls to save height */
+  /* box 1: leg count, then the "plan around" picker and date */
+  /* V6.1: one row (legs | plan around + date) when there's room; compact controls to save height */
+  /* V6.2: Reload example day / Clear all moved up into the box-1 title row, top right */
   .legrow{
-    display:grid; grid-template-columns:auto minmax(0,1fr) auto;
-    grid-template-areas:"seg sel btns"; align-items:end; gap:6px 10px;
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"seg sel"; align-items:end; gap:6px 10px;
   }
-  .legbtns{ justify-self:end; }
   .legrow .seg button{ min-width:30px; padding:5px 0; font-size:13px; }
   .legrow .fld.sel, .legrow .fld.datefld{ font-size:13px; padding:5px 6px; }
-  .legbtns{ gap:4px; }
-  .legbtns .btn{ padding:3px 8px; font-size:11.5px; }
   .legrow + .hint{ margin-top:6px; }
   .legrow .seg{ grid-area:seg; }
   .seg button{ min-width:40px; }
@@ -128,8 +126,9 @@
   @media (max-width:480px){ .band .tz:not(.warn):not(:has(span:not(.tzu))){ display:none; } }
   .band .tz.warn{ color:var(--amber); }
   @media (max-width:480px){ .band .tz .tzu, .band .tz .tzs{ display:none; } }
-  .legbtns{ grid-area:btns; display:flex; flex-direction:column; gap:6px; }
-  .legbtns .btn{ padding:6px 10px; font-size:12px; white-space:nowrap; }
+  .step-head.has-btns{ flex-wrap:wrap; row-gap:4px; }
+  .legbtns{ margin-left:auto; display:flex; flex-direction:row; gap:6px; }
+  .legbtns .btn{ padding:3px 8px; font-size:11.5px; white-space:nowrap; }
   /* "plan around" picker: which clock time is the one you type in */
   .fld.sel{
     width:auto; max-width:100%; text-align:left; font:500 14px 'IBM Plex Sans', sans-serif;
@@ -137,17 +136,16 @@
   }
   /* too narrow for one row (phones): picker drops under the leg buttons; the stacked buttons stay right */
   @media (max-width:600px){
-    .legrow{ grid-template-columns:auto minmax(0,1fr); grid-template-areas:"seg btns" "sel sel"; align-items:center; }
-    .legbtns{ flex-direction:row; }
+    .legrow{ grid-template-columns:minmax(0,1fr); grid-template-areas:"seg" "sel"; }
+    .legrow .seg{ justify-self:start; }
+    .legbtns{ gap:4px; }
     .legbtns .btn{ padding:3px 6px; font-size:11px; }
     .legrow .seg button{ min-width:28px; }
   }
   .fld.sel option{ background:var(--bg-panel); color:var(--text-primary); }
   /* under 360 px (e.g. 320 px phones) the three don't fit side by side: stack them, buttons in a row */
   @media (max-width:359px){
-    .legrow{ grid-template-columns:minmax(0,1fr); grid-template-areas:"seg" "sel" "btns"; }
-    .legbtns{ flex-direction:row; justify-self:start; }
-    .legrow .seg{ justify-self:start; }
+    .legbtns{ margin-left:0; }
     .anchorbox{ flex-wrap:wrap; }
   }
 
@@ -431,7 +429,7 @@
 
   <div class="title-row">
     <h1>Day's Flight Schedule</h1>
-    <span class="ver mono">v6.0</span>
+    <span class="ver mono">v6.2</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
 
@@ -441,7 +439,12 @@
 
     <section class="step screen-only">
       <div class="step-body">
-        <div class="step-head"><div class="step-num">1</div><h2>How many legs?</h2></div>
+        <div class="step-head has-btns"><div class="step-num">1</div><h2>How many legs?</h2>
+          <div class="legbtns">
+            <button class="btn" id="btnExample" type="button">Reload example day</button>
+            <button class="btn" id="btnClear" type="button">Clear all</button>
+          </div>
+        </div>
         <p class="hint">Airports, ETEs and fuel are yours to enter, or use the ForeFlight button below.</p>
         <div class="legrow">
           <div class="seg" id="legSeg" role="group" aria-label="Number of legs"></div>
@@ -454,10 +457,6 @@
               <label for="dateIn">Date</label>
               <div class="fld datefld"><span id="dateTxt"></span><input type="date" id="dateIn" aria-label="Date of the flying day"></div>
             </div>
-          </div>
-          <div class="legbtns">
-            <button class="btn" id="btnExample" type="button">Reload example day</button>
-            <button class="btn" id="btnClear" type="button">Clear all</button>
           </div>
         </div>
         <p class="hint">The time you plan around is the one you type in (marked <span class="tag" style="margin:0">start here</span>); every other time works out from it. Switching doesn't move the schedule.</p>
