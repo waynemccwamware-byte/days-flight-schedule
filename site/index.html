@@ -304,7 +304,6 @@
   .glance.many .gs .gt .ap{ display:none; }
 
   /* install (V5), same pattern as the Control Panel */
-  #installBtn{ margin-left:6px; }
   .install-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:20px; z-index:100; }
   .install-overlay.open{ display:flex; }
   .install-card{ background:var(--bg-panel); border:1px solid var(--bezel-hi); border-radius:10px; max-width:340px; padding:20px; box-shadow:0 12px 32px rgba(0,0,0,0.5); }
@@ -350,23 +349,6 @@
   .notice button{ background:none; border:0; color:var(--text-muted); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
 
   /* footer — same pattern as the other GeezerGeek Pilot apps */
-  footer.page-footer{ text-align:center; font-size:11px; color:var(--text-muted); margin-top:16px; }
-  .back-link{ margin-bottom:10px; }
-  .back-link a{
-    display:inline-block; background:var(--bezel); color:var(--amber); text-decoration:none;
-    border:1px solid var(--bezel-hi); border-radius:5px; padding:6px 14px; font-size:12px;
-  }
-  .back-link a:hover{ background:var(--bezel-hi); text-decoration:none; }
-  .credit-line{ margin-bottom:2px; }
-  .hit-counter{ margin-top:8px; font-size:11px; color:var(--text-muted); }
-  .share-btn{
-    display:inline-flex; align-items:center; gap:7px; margin-top:10px;
-    background:transparent; border:1px solid var(--bezel-hi); border-radius:20px; padding:8px 16px;
-    color:var(--text-muted); font-family:'IBM Plex Sans', sans-serif; font-size:12.5px; cursor:pointer;
-    transition:color .15s ease, border-color .15s ease;
-  }
-  .share-btn:hover{ color:var(--amber); border-color:var(--amber); }
-  .share-icon{ width:15px; height:15px; flex-shrink:0; }
 
   @media (max-width:480px){
     body{ padding:10px 8px 32px; }
@@ -398,7 +380,7 @@
     html,body{ background:#ffffff !important; color:var(--text-primary); }
     body{ padding:8mm 9mm; min-height:0; }
     .rig{ max-width:none; }
-    .purpose-line, .title-row .ver, .hint, .fine, .back-link, .hit-counter, .share-btn, #msg,
+    .purpose-line, .title-row .ver, .hint, .fine, #msg,
     .actions, .step-num, .screen-only, .notice{ display:none !important; }
     .title-row{ margin-bottom:6px; }
     .panel{ display:block; }   /* block, not flex/grid: browsers break these across pages more reliably */
@@ -418,18 +400,57 @@
     .band{ min-height:0; margin:4px 0 1px; padding:1px 6px; background:#dfe2e6; break-inside:avoid; break-after:avoid; }
     .grid .band .fld.apt-id{ font-size:13.5px; padding:0 2px; }
     .band .cap, .band .links{ font-size:11px; }
-    footer.page-footer{ margin-top:8px; }
-    .credit-line{ margin:0; }
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+<!-- GGP-FOOTER-CSS START v1 · 20-Oct-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<style>
+.ggp-footer{
+  --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
+  box-sizing:border-box; width:100%; max-width:640px; margin:28px auto 0; padding:16px 0 8px;
+  border-top:1px solid var(--ggp-bezel); text-align:center;
+  font-family:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size:11px; line-height:1.5; color:var(--ggp-muted);
+}
+.ggp-footer *, .ggp-footer *::before, .ggp-footer *::after{ box-sizing:border-box; }
+.ggp-footer .ggp-back{ margin:0 0 12px; }
+.ggp-footer .ggp-back a{
+  display:inline-block; padding:6px 14px; border:1px solid var(--ggp-bezel-hi); border-radius:5px;
+  background:var(--ggp-bezel); color:var(--ggp-amber); font-size:12px; font-weight:500; text-decoration:none;
+}
+.ggp-footer .ggp-back a:hover{ background:var(--ggp-bezel-hi); color:var(--ggp-amber); text-decoration:none; }
+.ggp-footer .ggp-extra{ margin:0 0 6px; text-wrap:balance; }
+.ggp-footer .ggp-credit{ margin:0; }
+.ggp-footer .ggp-extra a, .ggp-footer .ggp-credit a{
+  color:var(--ggp-muted); text-decoration:none; border-bottom:1px solid var(--ggp-bezel-hi); padding-bottom:1px;
+}
+.ggp-footer .ggp-extra a:hover, .ggp-footer .ggp-credit a:hover{ color:var(--ggp-amber); border-bottom-color:var(--ggp-amber); }
+.ggp-footer .ggp-count{ margin-top:6px; }
+.ggp-footer .ggp-count:empty{ display:none; }
+.ggp-footer .ggp-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:12px; }
+.ggp-footer .ggp-pill{
+  display:inline-flex; align-items:center; gap:7px; margin:0; padding:8px 16px;
+  border:1px solid var(--ggp-bezel-hi); border-radius:20px; background:transparent; color:var(--ggp-muted);
+  font:inherit; font-size:12.5px; line-height:1.2; cursor:pointer; transition:color .15s ease, border-color .15s ease;
+}
+.ggp-footer .ggp-pill:hover{ color:var(--ggp-amber); border-color:var(--ggp-amber); background:transparent; }
+.ggp-footer .ggp-pill svg{ width:15px; height:15px; flex-shrink:0; }
+.ggp-footer .ggp-pill span{ text-wrap:balance; }
+@media (max-width:400px){ .ggp-footer .ggp-pill{ font-size:12px; padding:8px 12px; gap:6px; } }
+.ggp-footer a:focus-visible, .ggp-footer .ggp-pill:focus-visible{ outline:2px solid var(--ggp-amber); outline-offset:2px; }
+@media print{
+  .ggp-footer .ggp-back, .ggp-footer .ggp-extra, .ggp-footer .ggp-count, .ggp-footer .ggp-actions{ display:none !important; }
+  .ggp-footer{ border-top:0; margin-top:8px; padding-top:0; }
+}
+</style>
+<!-- GGP-FOOTER-CSS END -->
 </head>
 <body>
 <div class="rig">
 
   <div class="title-row">
     <h1>Day's Flight Schedule</h1>
-    <span class="ver mono">v6.2</span>
+    <span class="ver mono">v6.3</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
 
@@ -534,19 +555,16 @@
 
   <p class="fine">Planning aid only. Check every time and fuel figure against your own flight planning. Weather links open third-party sites; not every airport reports weather.</p>
 
-  <footer class="page-footer">
-    <div class="back-link"><a href="https://geezer-geek-pilot-control-panel.netlify.app">&larr; Back to GeezerGeek Pilot Apps</a></div>
-    <div class="credit-line">Wayne McClelland, <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
-    <div class="hit-counter" id="hitCounter"></div>
-    <button id="shareBtn" class="share-btn" type="button">
-      <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-        <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
-      </svg>
-      <span>Share this app with pilot friends</span>
-    </button>
-    <button id="installBtn" class="share-btn" type="button" style="display:none;">Install this app</button>
-  </footer>
+  <!-- GGP-FOOTER START v1 · 20-Oct-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+<footer class="ggp-footer">
+  <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
+  <div class="ggp-credit">Wayne McClelland, <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
+  <div class="ggp-actions">
+    <button class="ggp-pill ggp-share" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg><span>Share GeezerGeek Pilot Apps with pilot friends</span></button>
+    <button class="ggp-pill" id="installBtn" type="button" style="display:none;"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 8 12 3 17 8"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Install this app</span></button>
+  </div>
+</footer>
+<!-- GGP-FOOTER END -->
 
   <div class="install-overlay" id="installOverlay">
     <div class="install-card">
@@ -2014,30 +2032,6 @@ function stateFromArr(arr){
   $('btnExample').addEventListener('click', () => { state = exampleState(); currentName = ''; save(); build(); renderSaves(); say('Example day loaded.'); });
   $('btnClear').addEventListener('click', () => { const n = state.legs; state = blankState(); state.legs = n; currentName = ''; save(); build(); renderSaves(); say('Cleared.'); });
 
-  // ---- share button (App-Conventions §6a) ----
-  (() => {
-    const APP_URL   = 'https://days-flight-schedule.netlify.app/';   // canonical live URL from §1
-    const APP_TITLE = "Day's Flight Schedule";
-    const APP_TEXT  = 'Plan a multi-leg flying day: every clock time, fuel and airtime in one place.';
-    const btn = document.getElementById('shareBtn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      const label = btn.querySelector('span') || btn;
-      const original = label.textContent;
-      if (navigator.share){
-        try { await navigator.share({ title: APP_TITLE, text: APP_TEXT, url: APP_URL }); return; }
-        catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
-      }
-      try {
-        await navigator.clipboard.writeText(APP_URL);
-        label.textContent = 'Link copied to clipboard!';
-        setTimeout(() => { label.textContent = original; }, 2200);
-      } catch (err) {
-        window.location.href = 'mailto:?subject=' + encodeURIComponent(APP_TITLE)
-          + '&body=' + encodeURIComponent(APP_TEXT + ' ' + APP_URL);
-      }
-    });
-  })();
 
   // ---- open counter (App-Conventions §6b; Tally, fails silently) ----
   fetch('https://tally.yuki.sh/hits/wamware/days-flight-schedule.json')
@@ -2091,5 +2085,54 @@ function stateFromArr(arr){
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
+<!-- GGP-FOOTER-JS START v1 · 20-Oct-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<script>
+(() => {
+  if (window.__ggpFooter) return;
+  window.__ggpFooter = true;
+  // Every app's footer share button shares the Control Panel, not the app itself.
+  const SHARE_URL   = 'https://geezer-geek-pilot-control-panel.netlify.app/';
+  const SHARE_TITLE = 'GeezerGeek Pilot Apps';
+  const SHARE_TEXT  = 'Planning, weather, ATC-practice and safety tools for GA pilots, from GeezerGeek Pilot.';
+  const flash = (btn) => {
+    if (btn.dataset.ggpBusy) return;
+    btn.dataset.ggpBusy = '1';
+    const label = btn.querySelector('span') || btn;
+    const original = label.textContent;
+    label.textContent = label === btn ? 'Link copied!' : 'Link copied to clipboard!';
+    setTimeout(() => { label.textContent = original; delete btn.dataset.ggpBusy; }, 2200);
+  };
+  // One listener on the document, so it also covers footers an app draws later and any other
+  // button given the ggp-share class.
+  document.addEventListener('click', async (ev) => {
+    const btn = ev.target instanceof Element ? ev.target.closest('.ggp-share') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    if (navigator.share) {
+      try { await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url: SHARE_URL }); return; }
+      catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+    }
+    try {
+      await navigator.clipboard.writeText(SHARE_URL);
+      flash(btn);
+    } catch (err) {
+      window.location.href = 'mailto:?subject=' + encodeURIComponent(SHARE_TITLE)
+        + '&body=' + encodeURIComponent(SHARE_TEXT + ' ' + SHARE_URL);
+    }
+  });
+  // Open counter: shown only where the footer has #ggpCount (the Control Panel). Apps count silently.
+  const countEl = document.getElementById('ggpCount');
+  if (countEl) {
+    fetch('https://tally.yuki.sh/hits/wamware/geezer-geek-pilot-control-panel.json')
+      .then(r => r.json())
+      .then(d => {
+        const n = d && d.visit;
+        if (typeof n === 'number') countEl.textContent = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+      })
+      .catch(() => { /* counter is a nice-to-have, never block the app */ });
+  }
+})();
+</script>
+<!-- GGP-FOOTER-JS END -->
 </body>
 </html>
