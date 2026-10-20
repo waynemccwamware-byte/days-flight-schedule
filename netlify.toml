@@ -1,0 +1,10 @@
+# Day's Flight Schedule — deployed by Netlify from this GitHub repo (main branch).
+# No build step: Netlify publishes site/ as-is and bundles the dependency-free
+# sync function from netlify/functions/.
+[build]
+  publish = "site"
+  functions = "netlify/functions"
+  command = ""
+
+[functions]
+  node_bundler = "esbuild"

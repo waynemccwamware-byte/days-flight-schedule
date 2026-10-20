@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<!-- Day's Flight Schedule V6 (15-Oct-2026): flight date + per-airport local times (airport-tz.json); based on V5 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Day's Flight Schedule</title>
+<meta name="theme-color" content="#10141a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flight Day">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#10141a;
+    --bg-panel:#1b222c;
+    --bezel:#2a323f;
+    --bezel-hi:#3a4454;
+    --amber:#f5a623;
+    --amber-dim:#7a5a1e;
+    --amber-glow:rgba(245,166,35,0.35);
+    --text-primary:#e7e4dc;
+    --text-muted:#8b93a1;
+    --teal:#3fa7a0;
+    --alert:#e0705f;
+    --indent:14px;
+    --fuel-indent:36px;
+    --avgas:#4d94f0;   /* 100LL blue */
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top, 0px);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  *,*::before,*::after{ box-sizing:inherit; }
+  html{
+    background:var(--bg-deep);
+    overscroll-behavior:none;
+    scroll-padding-top:env(safe-area-inset-top, 0px);
+    color-scheme:dark;
+  }
+  body{
+    margin:0;
+    min-height:100vh;
+    overscroll-behavior:none;
+    background:radial-gradient(ellipse at 50% 0%, #171d26 0%, var(--bg-deep) 60%);
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--text-primary);
+    padding:14px 12px 40px;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  .rig{ width:100%; max-width:640px; margin:0 auto; }
+
+  .title-row{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:2px; padding:0 4px;
+  }
+  .title-row h1{ font-size:19px; font-weight:600; margin:0; letter-spacing:0.01em; }
+  .title-row .ver{ font-size:11px; color:var(--text-muted); }
+
+  .purpose-line{
+    font-size:12.5px; color:var(--teal);
+    margin:4px 4px 10px; line-height:1.5;
+  }
+  .purpose-label{ color:var(--text-primary); }
+
+  .panel{ display:flex; flex-direction:column; gap:10px; }
+
+  .step{
+    display:grid; grid-template-columns:26px minmax(0,1fr); gap:10px;
+    padding:12px 14px;
+    background:var(--bg-panel);
+    border:1px solid var(--bezel-hi);
+    border-radius:10px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .step-num{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--amber);
+    border:1px solid var(--amber-dim); border-radius:50%;
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center; margin-top:2px;
+  }
+  .step-body h2{ font-size:13.5px; font-weight:600; margin:0 0 2px; letter-spacing:0.02em; }
+  .step-body p.hint{ font-size:12px; color:var(--text-muted); margin:0 0 8px; line-height:1.45; }
+
+  /* leg-count selector */
+  .seg{ display:inline-flex; border:1px solid var(--bezel-hi); border-radius:6px; overflow:hidden; }
+  .seg button{
+    background:var(--bg-deep); color:var(--text-muted); border:0; border-right:1px solid var(--bezel-hi);
+    padding:9px 0; min-width:48px; font:500 15px 'IBM Plex Mono', monospace; cursor:pointer;
+  }
+  .seg button:last-child{ border-right:0; }
+  .seg button.on{ background:rgba(245,166,35,0.15); color:var(--amber); }
+  .seg button:focus-visible{ outline:2px solid var(--amber); outline-offset:-2px; }
+  /* box 1: leg count, then the "plan around" picker, then the two buttons stacked at the right edge */
+  /* V6.1: one row (legs | plan around + date | buttons) when there's room; compact controls to save height */
+  .legrow{
+    display:grid; grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-areas:"seg sel btns"; align-items:end; gap:6px 10px;
+  }
+  .legbtns{ justify-self:end; }
+  .legrow .seg button{ min-width:30px; padding:5px 0; font-size:13px; }
+  .legrow .fld.sel, .legrow .fld.datefld{ font-size:13px; padding:5px 6px; }
+  .legbtns{ gap:4px; }
+  .legbtns .btn{ padding:3px 8px; font-size:11.5px; }
+  .legrow + .hint{ margin-top:6px; }
+  .legrow .seg{ grid-area:seg; }
+  .seg button{ min-width:40px; }
+  .anchorbox{ grid-area:sel; display:flex; flex-wrap:nowrap; align-items:flex-end; gap:6px 10px; min-width:0; }
+  .anchorbox .pick{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; max-width:100%; }
+  .anchorbox label{ font-size:11px; color:var(--text-muted); letter-spacing:0.02em; }
+  /* date: shows "Fri 16-Oct-2026"; a transparent native date input on top opens the system picker */
+  .fld.datefld{ position:relative; width:auto; text-align:left; font:500 14px 'IBM Plex Sans', sans-serif;
+    padding:7px 8px; border-color:var(--amber-dim); white-space:nowrap; cursor:pointer; }
+  .fld.datefld:focus-within{ border-color:var(--amber); box-shadow:0 0 0 2px var(--amber-glow); }
+  .datefld input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; margin:0; padding:0; cursor:pointer; font-size:16px; }
+  .datefld input::-webkit-calendar-picker-indicator{ position:absolute; inset:0; width:auto; height:auto; margin:0; padding:0; cursor:pointer; }
+  .dayhead{ margin-left:auto; font:500 12.5px 'IBM Plex Mono', monospace; color:var(--text-muted); white-space:nowrap; }
+  .gcmt .hometime{ font:400 12.5px 'IBM Plex Mono', monospace; color:var(--text-muted); white-space:nowrap; }
+  @media (max-width:480px){ .gcmt{ flex-wrap:wrap; row-gap:0; } .gcmt .hometime{ font-size:11px; } }
+  @media (max-width:380px){ .gcmt .hometime{ white-space:normal; min-width:0; } }
+  .band .tz{ font:500 11.5px 'IBM Plex Mono', monospace; color:var(--teal); white-space:nowrap; }
+  .band .tz:empty{ display:none; }
+  @media (max-width:480px){ .band .tz:not(.warn):not(:has(span:not(.tzu))){ display:none; } }
+  .band .tz.warn{ color:var(--amber); }
+  @media (max-width:480px){ .band .tz .tzu, .band .tz .tzs{ display:none; } }
+  .legbtns{ grid-area:btns; display:flex; flex-direction:column; gap:6px; }
+  .legbtns .btn{ padding:6px 10px; font-size:12px; white-space:nowrap; }
+  /* "plan around" picker: which clock time is the one you type in */
+  .fld.sel{
+    width:auto; max-width:100%; text-align:left; font:500 14px 'IBM Plex Sans', sans-serif;
+    padding:7px 8px; border-color:var(--amber-dim); cursor:pointer;
+  }
+  /* too narrow for one row (phones): picker drops under the leg buttons; the stacked buttons stay right */
+  @media (max-width:600px){
+    .legrow{ grid-template-columns:auto minmax(0,1fr); grid-template-areas:"seg btns" "sel sel"; align-items:center; }
+    .legbtns{ flex-direction:row; }
+    .legbtns .btn{ padding:3px 6px; font-size:11px; }
+    .legrow .seg button{ min-width:28px; }
+  }
+  .fld.sel option{ background:var(--bg-panel); color:var(--text-primary); }
+  /* under 360 px (e.g. 320 px phones) the three don't fit side by side: stack them, buttons in a row */
+  @media (max-width:359px){
+    .legrow{ grid-template-columns:minmax(0,1fr); grid-template-areas:"seg" "sel" "btns"; }
+    .legbtns{ flex-direction:row; justify-self:start; }
+    .legrow .seg{ justify-self:start; }
+    .anchorbox{ flex-wrap:wrap; }
+  }
+
+  /* ---- V3 spreadsheet grid: label | time | comment, every time on one right edge ---- */
+  .grid{ --tw:112px; }
+  .grow{
+    display:grid; grid-template-columns:minmax(0,1fr) var(--tw) minmax(0,1.4fr);
+    column-gap:10px; align-items:center; min-height:34px; padding:2px 0;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .glbl{ font-size:14px; line-height:1.25; min-width:0; }
+  .grow.ms .glbl{ font-weight:600; }
+  .glbl .legname{ color:var(--amber); font-weight:600; }
+  .gtime{ min-width:0; }
+  .gcmt{ min-width:0; display:flex; align-items:center; gap:8px; }
+  .gcmt .tag{ margin:0; font-size:12.5px; white-space:nowrap; }
+  .notewrap{ width:100%; min-width:0; }
+  .ptext{ display:none; }
+  .gcmt .sub{ font:400 12.5px 'IBM Plex Mono', monospace; color:var(--text-muted); }
+
+  /* entered values: quiet underline, no box */
+  .grid .fld{
+    width:100%; background:transparent; border:0; border-bottom:1px solid var(--bezel-hi); border-radius:3px 3px 0 0;
+    padding:4px 8px; font:500 16px 'IBM Plex Mono', monospace; color:var(--text-primary); text-align:right; box-shadow:none;
+  }
+  .grid .fld:focus{ border-bottom-color:var(--amber); background:rgba(245,166,35,0.08); box-shadow:none; }
+  .grid .fld.bad{ border-bottom-color:var(--alert); color:var(--alert); }
+  .grid .fld.note{ text-align:left; font:400 16px 'IBM Plex Sans', sans-serif; color:#c9cfd8; }
+  /* calculated clock times: shaded cell, like the spreadsheet's gray cells */
+  .grid .calc{
+    display:flex; justify-content:flex-end; align-items:baseline; gap:6px; width:100%;
+    background:rgba(255,255,255,0.065); border-radius:3px; padding:4px 8px;
+    font:500 16px 'IBM Plex Mono', monospace; color:var(--amber); white-space:nowrap;
+  }
+  .grid .calc .day{ margin-right:auto; font-size:10.5px; color:var(--text-muted); }
+  /* the one typed clock time: filled amber, like the sheet's orange cell */
+  .grid .fld.anchor{
+    background:var(--amber); color:#10141a; font-weight:600; border-bottom-color:var(--amber);
+    border-radius:3px; color-scheme:light; width:100%;
+  }
+  .grid .fld.anchor:focus{ box-shadow:0 0 0 2px var(--amber-glow); }
+  .grid .fld.anchor::-webkit-date-and-time-value{ text-align:right; }
+  .grid .fld.anchor::-webkit-calendar-picker-indicator{ display:none; }   /* frees room in the time column; typing still works */
+  /* fuel: avgas blue, in the comment column like the sheet's "Plan Fuel" */
+  .fuelcell{ display:flex; align-items:center; justify-content:flex-end; gap:8px; width:100%; }
+  .fuelcell .flbl{ font-size:12.5px; color:var(--text-muted); white-space:nowrap; }
+  .fuelcell .fld{ width:76px; flex-shrink:0; }
+  .grid .fuel .fld, .grid .fuel .calc, .fuelcell .fld{ color:var(--avgas); }
+
+  /* airport band: the section break, like the sheet's gray KSBA rows */
+  .band{
+    display:flex; align-items:center; gap:4px 10px; flex-wrap:wrap;
+    margin:10px -8px 2px; padding:4px 8px; min-height:42px;
+    background:var(--bezel); border-radius:6px;
+  }
+  .grid .band .fld.apt-id{
+    width:80px; text-align:left; padding:3px 4px; font:600 19px 'IBM Plex Mono', monospace; letter-spacing:0.06em;
+    color:var(--text-primary);
+  }
+  .band .cap{ font-size:12.5px; color:var(--text-muted); }
+  .band .links{ margin-left:auto; display:flex; gap:14px; font-size:13px; white-space:nowrap; }
+
+  .fld{
+    background:var(--bg-deep); color:var(--text-primary);
+    border:1px solid var(--bezel-hi); border-radius:6px;
+    font:500 16px 'IBM Plex Mono', monospace;
+    padding:5px 10px; width:98px; text-align:right; outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .fld::placeholder{ color:#566070; }
+  .fld:focus{ border-color:var(--amber); box-shadow:0 0 0 2px var(--amber-glow); }
+  .fld.bad{ border-color:var(--alert); }
+  .fld.anchor{ width:132px; border-color:var(--amber); box-shadow:0 0 0 1px var(--amber-dim); }
+  .fld.note{
+    width:100%; text-align:left; font:400 16px 'IBM Plex Sans', sans-serif; padding:5px 10px;
+  }
+  .tag{ color:var(--amber); font-size:11.5px; margin-left:6px; font-weight:500; }
+
+  a{ color:var(--teal); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+  a.off{ color:#566070; pointer-events:none; }
+
+  .var{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; min-width:52px; text-align:right;
+    color:var(--text-muted);
+  }
+  .var.over{ color:var(--amber); }
+  .var.under{ color:var(--teal); }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:10px; }
+  .btn{
+    font:500 13px 'IBM Plex Sans', sans-serif; padding:10px 16px; border-radius:6px;
+    border:1px solid var(--bezel-hi); background:transparent; color:var(--text-muted); cursor:pointer;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  .btn.primary{ color:var(--amber); border-color:var(--amber-dim); background:rgba(245,166,35,0.08); }
+  #msg{ min-height:16px; margin-top:10px; font-size:12px; color:var(--teal); }
+
+  .fine{ margin:10px 4px 0; font-size:11px; line-height:1.6; color:var(--text-muted); }
+
+  /* card header: number beside the title, so the card body gets the full width */
+  .step{ display:block; }
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:2px; }
+  .step-head .step-num{ margin-top:0; flex-shrink:0; }
+  .step-head h2{ margin:0; }
+  .step-body > .hint:first-of-type{ margin-top:4px; }
+
+  /* saved days + link notice */
+  .saverow{ display:flex; gap:8px; align-items:center; }
+  .fld.savename{ flex:1; width:auto; min-width:0; text-align:left; font:400 16px 'IBM Plex Sans', sans-serif; }
+  .savelist{ position:relative; margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+  /* more than 3 saves: the list scrolls; height is set in renderSaves() to show 3 rows plus a peek of the 4th */
+  .savelist.scroll{ overflow-y:auto; overscroll-behavior:contain; padding-right:4px; scrollbar-color:var(--bezel-hi) transparent; }
+  .saveitem{
+    display:flex; align-items:center; gap:8px; padding:6px 10px;
+    background:var(--bg-deep); border:1px solid var(--bezel); border-radius:8px;
+  }
+  .saveitem.current{ border-color:var(--amber-dim); }
+  .saveitem .info{ flex:1; min-width:0; }
+  .saveitem .nm{ font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+  .saveitem .meta{ font:400 11.5px 'IBM Plex Mono', monospace; color:var(--text-muted); margin-top:1px; overflow-wrap:anywhere; }
+  .saveitem .btn{ padding:6px 12px; font-size:12.5px; flex-shrink:0; }
+  .btn.danger{ color:var(--alert); border-color:var(--alert); }
+  .empty{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .savemsg{ min-height:16px; margin-top:8px; font-size:12px; color:var(--teal); }
+  .savemsg button{ margin-left:8px; padding:0; background:none; border:0; color:var(--amber); font:inherit; text-decoration:underline; cursor:pointer; }
+  /* day at a glance (V4): stylized route strip, like the launcher's Schedule tile; no card box */
+  .glance-card{ padding:2px 4px 0; background:none; border:0; box-shadow:none; }
+  .glance{ position:relative; display:grid; grid-template-columns:repeat(var(--n,4), minmax(0,1fr)); text-align:center; --th:18px; --dot:14px; }
+  .glance::before{   /* the route line, dot center to dot center */
+    content:''; position:absolute; height:3px; border-radius:2px; background:var(--bezel-hi);
+    left:calc(50% / var(--n,4)); right:calc(50% / var(--n,4)); top:calc(var(--th) + 4px + var(--dot) / 2 - 1.5px);
+  }
+  .gs{ position:relative; min-width:0; padding:0 2px; }
+  .gs .gt{ height:var(--th); display:flex; align-items:flex-end; justify-content:center; gap:2px;
+    font:600 13px 'IBM Plex Mono', monospace; color:var(--amber); white-space:nowrap; }
+  .gs .gt .ap{ font-size:8px; font-weight:500; margin-bottom:1px; }
+  .gs .gt .dd{ font-size:8px; color:var(--text-muted); margin-bottom:1px; }
+  .gs .gt.none{ color:#566070; }
+  .gs .gd{ width:var(--dot); height:var(--dot); border-radius:50%; margin:4px auto 0; background:var(--amber); }
+  .gs.end .gd{ background:var(--teal); }
+  .gs .gc{ margin-top:4px; font:500 10.5px 'IBM Plex Mono', monospace; letter-spacing:0.04em; color:var(--text-primary); overflow-wrap:anywhere; }
+  .gs .gc.none{ color:#566070; }
+  .gs .gl{ margin-top:1px; font-size:8.5px; font-weight:600; line-height:1.2; color:var(--text-muted); }
+  .gs .gl.eta{ color:var(--amber); opacity:0.85; letter-spacing:0.06em; }
+  @media (max-width:480px){
+    .glance{ --th:16px; --dot:11px; }
+    .gs .gt{ font-size:10.5px; }
+    .gs .gt .ap{ font-size:6.5px; }
+    .gs .gc{ font-size:9.5px; }
+    .gs .gl{ font-size:8px; }
+  }
+  .glance.many .gs .gt{ font-size:10px; }
+  .glance.many .gs .gt .ap{ display:none; }
+
+  /* install (V5), same pattern as the Control Panel */
+  #installBtn{ margin-left:6px; }
+  .install-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:20px; z-index:100; }
+  .install-overlay.open{ display:flex; }
+  .install-card{ background:var(--bg-panel); border:1px solid var(--bezel-hi); border-radius:10px; max-width:340px; padding:20px; box-shadow:0 12px 32px rgba(0,0,0,0.5); }
+  .install-card p{ margin:0 0 16px; font-size:13.5px; line-height:1.6; color:var(--text-primary); }
+  .install-close{ display:block; margin-left:auto; font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--bg-deep); background:var(--amber); border:none; border-radius:5px; padding:6px 14px; cursor:pointer; }
+  @media print{ .install-overlay, #installBtn{ display:none !important; } }
+
+  /* hand-off cover (V5): this tab passed its link to an already-open window */
+  .sentcover{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:rgba(16,20,26,0.94); }
+  .sentbox{ max-width:420px; text-align:center; background:var(--bg-panel); border:1px solid var(--bezel-hi); border-radius:10px; padding:20px 18px; }
+  .sentbox h2{ margin:0 0 8px; font-size:16px; color:var(--teal); }
+  .sentbox p{ margin:0 0 14px; font-size:13px; line-height:1.5; color:var(--text-primary); }
+  @media print{ .sentcover{ display:none !important; } }
+
+  /* ForeFlight via Claude (V5) */
+  .ffbox{ margin-top:8px; padding-top:8px; border-top:1px solid var(--bezel); display:flex; align-items:center; gap:10px; }
+  .ffbox .btn{ flex:0 0 auto; max-width:36%; border-color:var(--teal); color:var(--teal); padding:6px 8px; font-size:12px; line-height:1.25; }
+  .ffbox .btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .step-body p.hint.ffhint{ flex:1 1 0; min-width:0; margin:0; font-size:10px; line-height:1.3; }
+  @media (min-width:601px){ .ffbox .btn{ max-width:none; } }
+
+  /* sync (V4) */
+  .syncbox{ margin-top:6px; padding-top:10px; border-top:1px solid var(--bezel); }
+  .syncline{ display:flex; align-items:center; gap:8px; font-size:12.5px; line-height:1.45; }
+  .syncline .mono{ color:var(--text-primary); letter-spacing:0.04em; }
+  .syncdot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; background:#566070; }
+  .syncdot.on{ background:var(--teal); box-shadow:0 0 6px rgba(63,167,160,0.6); }
+  .syncdot.busy{ background:var(--amber); }
+  .syncdot.err{ background:var(--alert); }
+  .syncbtns{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .syncbtns .btn{ padding:6px 12px; font-size:12.5px; }
+  .syncbox .saverow{ margin-top:8px; }
+  .syncbox [hidden]{ display:none !important; }
+  .hint.synchint{ margin:8px 0 0; font-size:11.5px; }
+  .syncdemo{ margin-top:8px; padding:6px 10px; font-size:11.5px; line-height:1.45; color:var(--text-muted); border:1px dashed var(--bezel-hi); border-radius:6px; }
+  .syncdemo button{ display:block; margin-top:4px; padding:0; background:none; border:0; color:var(--amber); font:inherit; text-decoration:underline; cursor:pointer; text-align:left; }
+  .notice{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin:0 0 10px; padding:8px 12px;
+    background:rgba(245,166,35,0.08); border:1px solid var(--amber-dim); border-radius:8px; font-size:12.5px; line-height:1.45;
+  }
+  .notice[hidden]{ display:none; }
+  .notice button{ background:none; border:0; color:var(--text-muted); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
+
+  /* footer — same pattern as the other GeezerGeek Pilot apps */
+  footer.page-footer{ text-align:center; font-size:11px; color:var(--text-muted); margin-top:16px; }
+  .back-link{ margin-bottom:10px; }
+  .back-link a{
+    display:inline-block; background:var(--bezel); color:var(--amber); text-decoration:none;
+    border:1px solid var(--bezel-hi); border-radius:5px; padding:6px 14px; font-size:12px;
+  }
+  .back-link a:hover{ background:var(--bezel-hi); text-decoration:none; }
+  .credit-line{ margin-bottom:2px; }
+  .hit-counter{ margin-top:8px; font-size:11px; color:var(--text-muted); }
+  .share-btn{
+    display:inline-flex; align-items:center; gap:7px; margin-top:10px;
+    background:transparent; border:1px solid var(--bezel-hi); border-radius:20px; padding:8px 16px;
+    color:var(--text-muted); font-family:'IBM Plex Sans', sans-serif; font-size:12.5px; cursor:pointer;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .share-btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .share-icon{ width:15px; height:15px; flex-shrink:0; }
+
+  @media (max-width:480px){
+    body{ padding:10px 8px 32px; }
+    .step{ padding:10px 10px; }
+    .step-num{ width:20px; height:20px; font-size:11px; }
+    .fld{ padding:7px 8px; }
+    .grid{ --tw:92px; }
+    .grow{ grid-template-columns:minmax(0,1.15fr) var(--tw) minmax(0,1fr); column-gap:8px; }
+    .glbl{ font-size:13px; }
+    .grid .fld, .grid .calc{ padding:4px 6px; }
+    .grid .fld.note{ font-size:16px; }   /* stays 16px: smaller makes iPhone zoom on focus */
+    .fuelcell{ gap:5px; }
+    .fuelcell .flbl .long{ display:none; }
+    .fuelcell .fld{ width:62px; }
+    .band{ margin-left:-6px; margin-right:-6px; padding:4px 6px; }
+    .grid .band .fld.apt-id{ width:72px; font-size:18px; }
+    .band .links{ gap:10px; font-size:12.5px; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; } }
+
+  /* print / save-as-PDF: white paper, same layout, tighter spacing, only the schedule and plan-vs-actual */
+  @media print{
+    :root{
+      --bg-deep:#ffffff; --bg-panel:#ffffff; --bezel:#d3d7de; --bezel-hi:#aab1bc;
+      --amber:#a35a00; --amber-dim:#d4b078; --text-primary:#14171c; --text-muted:#5a6270; --teal:#0b6b66; --avgas:#1f5fbf; --fuel-indent:26px;
+    }
+    @page{ margin:0; }
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    html,body{ background:#ffffff !important; color:var(--text-primary); }
+    body{ padding:8mm 9mm; min-height:0; }
+    .rig{ max-width:none; }
+    .purpose-line, .title-row .ver, .hint, .fine, .back-link, .hit-counter, .share-btn, #msg,
+    .actions, .step-num, .screen-only, .notice{ display:none !important; }
+    .title-row{ margin-bottom:6px; }
+    .panel{ display:block; }   /* block, not flex/grid: browsers break these across pages more reliably */
+    .step{ display:block; margin-bottom:6px; padding:6px 10px; box-shadow:none; }
+    .step-body h2{ font-size:12px; margin:0 0 2px; }
+    .grid{ --tw:96px; }
+    .grow{ min-height:0; padding:0; border-bottom-color:#e6e8ec; break-inside:avoid; }
+    .glbl{ font-size:12px; }
+    .grid .fld, .grid .calc{ font-size:12.5px; padding:1px 6px; }
+    .grid .fld{ border-bottom-color:transparent; }   /* entries print as plain text */
+    .grid .fld.note{ display:none; }
+    .ptext{ display:block; font-size:11.5px; line-height:1.3; padding:1px 6px; white-space:normal; overflow-wrap:anywhere; }
+    .grid .calc{ background:#eceef1; }
+    .grid .fld.anchor{ background:#f5a623 !important; color:#000; }
+    .fld::placeholder{ color:transparent; }
+    .fld.anchor::-webkit-calendar-picker-indicator{ display:none; }
+    .band{ min-height:0; margin:4px 0 1px; padding:1px 6px; background:#dfe2e6; break-inside:avoid; break-after:avoid; }
+    .grid .band .fld.apt-id{ font-size:13.5px; padding:0 2px; }
+    .band .cap, .band .links{ font-size:11px; }
+    footer.page-footer{ margin-top:8px; }
+    .credit-line{ margin:0; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+</head>
+<body>
+<div class="rig">
+
+  <div class="title-row">
+    <h1>Day's Flight Schedule</h1>
+    <span class="ver mono">v6.0</span>
+  </div>
+  <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
+
+  <div class="notice" id="notice" role="status" hidden><span id="noticeText"></span><button type="button" id="noticeClose" aria-label="Dismiss">&times;</button></div>
+
+  <div class="panel">
+
+    <section class="step screen-only">
+      <div class="step-body">
+        <div class="step-head"><div class="step-num">1</div><h2>How many legs?</h2></div>
+        <p class="hint">Airports, ETEs and fuel are yours to enter, or use the ForeFlight button below.</p>
+        <div class="legrow">
+          <div class="seg" id="legSeg" role="group" aria-label="Number of legs"></div>
+          <div class="anchorbox">
+            <div class="pick">
+              <label for="anchorSel">Plan around</label>
+              <select class="fld sel" id="anchorSel"></select>
+            </div>
+            <div class="pick">
+              <label for="dateIn">Date</label>
+              <div class="fld datefld"><span id="dateTxt"></span><input type="date" id="dateIn" aria-label="Date of the flying day"></div>
+            </div>
+          </div>
+          <div class="legbtns">
+            <button class="btn" id="btnExample" type="button">Reload example day</button>
+            <button class="btn" id="btnClear" type="button">Clear all</button>
+          </div>
+        </div>
+        <p class="hint">The time you plan around is the one you type in (marked <span class="tag" style="margin:0">start here</span>); every other time works out from it. Switching doesn't move the schedule.</p>
+        <div class="ffbox">
+          <button class="btn" id="btnClaudeFF" type="button">Get ETE &amp; fuel from ForeFlight (via Claude)</button>
+          <p class="hint ffhint">Opens Claude in a new window; give it your airports and times. Claude runs each leg through ForeFlight and sends back a link; tap it to open the new day here with ETE and fuel filled in. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step screen-only glance-card" aria-label="Day at a glance">
+      <div class="glance" id="glance"></div>
+    </section>
+
+    <section class="step">
+      <div class="step-body">
+        <div class="step-head"><div class="step-num">2</div><h2>Schedule</h2><span class="dayhead" id="dayHead"></span></div>
+        <p class="hint">Underlined fields are yours to fill in; shaded times are calculated. Enter times as h:mm, or digits only (130 = 1:30, 45 = 0:45). Each airport's times are local there; where an airport's clock differs from airport 1's (the date sets daylight saving), airport 1's time follows in parentheses. The right-hand column holds notes: route for each leg, anything else for a stop.</p>
+        <div class="grid" id="timeline"></div>
+      </div>
+    </section>
+
+    <section class="step">
+      <div class="step-body">
+        <div class="step-head"><div class="step-num">3</div><h2>Plan vs. actual</h2></div>
+        <p class="hint">Plan totals add up every leg, including pattern/approach time. Enter your actual tach time (hours, tenths) and fuel (gallons) at the end of the day.</p>
+        <div class="grid" id="summary"></div>
+      </div>
+    </section>
+
+    <section class="step screen-only">
+      <div class="step-body">
+        <div class="step-head"><div class="step-num">4</div><h2>Saved schedules</h2></div>
+        <p class="hint" id="saveHint">Save this schedule under a name and load it later. Turn on sync to keep the same list on all your devices.</p>
+        <div class="saverow">
+          <input class="fld savename" id="saveName" type="text" maxlength="48" placeholder="Name, e.g. Baja trip in March" autocomplete="off" aria-label="Name for this saved day">
+          <button class="btn primary" id="btnSave" type="button">Save</button>
+        </div>
+        <div class="savelist" id="saveList"></div>
+        <div class="savemsg" id="saveMsg" role="status" aria-live="polite"></div>
+        <div class="syncbox" id="syncBox">
+          <div class="syncline"><span class="syncdot" id="syncDot"></span><span id="syncStatus">Sync is off. Saves stay on this device.</span></div>
+          <div class="syncbtns" id="syncOffBtns">
+            <button class="btn" id="btnSyncOn" type="button">Turn on sync</button>
+            <button class="btn" id="btnSyncHave" type="button">I have a sync code</button>
+          </div>
+          <div class="saverow" id="syncJoinRow" hidden>
+            <input class="fld savename mono" id="syncCodeIn" type="text" maxlength="16" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Sync code">
+            <button class="btn primary" id="btnSyncJoin" type="button">Join</button>
+          </div>
+          <div class="syncbtns" id="syncOnBtns" hidden>
+            <button class="btn" id="btnSyncNow" type="button">Sync now</button>
+            <button class="btn" id="btnSyncCopy" type="button">Copy code</button>
+            <button class="btn" id="btnSyncOff" type="button">Turn off on this device</button>
+          </div>
+          <p class="hint synchint" id="syncHint">Turning on sync gives you a code. Enter it once on each of your other devices, and they all keep one list. Anyone with the code can see these saves, so treat it like a password.</p>
+          <div class="syncdemo" id="syncDemo" hidden>Demo mode: this preview can't reach the app's server, so sync goes to a stand-in server inside this browser. <button type="button" id="btnDemoOther">Simulate another device saving a schedule</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step screen-only">
+      <div class="step-body">
+        <div class="step-head"><div class="step-num">5</div><h2>Share schedule</h2></div>
+        <p class="hint">Print opens your print dialog; choose Save as PDF there if you want a file. On iPhone and iPad it makes a PDF and opens the share sheet, where you can pick Print or Save to Files. Copy schedule link makes an address that reopens this exact schedule on any device.</p>
+        <div class="actions">
+          <button class="btn primary" id="btnPrint" type="button">Print / PDF</button>
+          <button class="btn" id="btnLink" type="button">Copy schedule link</button>
+        </div>
+        <div id="msg" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="fine">Planning aid only. Check every time and fuel figure against your own flight planning. Weather links open third-party sites; not every airport reports weather.</p>
+
+  <footer class="page-footer">
+    <div class="back-link"><a href="https://geezer-geek-pilot-control-panel.netlify.app">&larr; Back to GeezerGeek Pilot Apps</a></div>
+    <div class="credit-line">Wayne McClelland, <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
+    <div class="hit-counter" id="hitCounter"></div>
+    <button id="shareBtn" class="share-btn" type="button">
+      <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+        <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
+      </svg>
+      <span>Share this app with pilot friends</span>
+    </button>
+    <button id="installBtn" class="share-btn" type="button" style="display:none;">Install this app</button>
+  </footer>
+
+  <div class="install-overlay" id="installOverlay">
+    <div class="install-card">
+      <p id="installText"></p>
+      <button class="install-close" id="installClose" type="button">Got it</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/*BEGIN CORE*/
+const MAXLEGS = 5;
+const KEY = 'dfs.v1';
+
+// Arrays are 1-based by leg / stop (index 0 unused), except apts (0 = origin, i = destination of leg i).
+function blankState(){
+  const a = (v) => Array.from({length: MAXLEGS + 1}, () => v);
+  return {
+    legs: 3, wheels: '08:00', travel: '0:15', pre: '0:45', fuel: '0:00', post: '0:30', ground: '0:15',
+    apts: a(''), ete: a(''), pat: a('0:05'), gal: a(''), turn: a('0:45'), tnote: a(''), route: a(''),
+    arrive0Note: '', actTach: '', actFuel: '',
+    anchor: 'wu1',   // which clock time 'wheels' holds: home | wuN | arrN | dest
+    date: tomorrowIso()   // V6: the flying day, YYYY-MM-DD; picks each airport's UTC offset (DST) for that day
+  };
+}
+function exampleState(){
+  const s = blankState();
+  s.wheels = '08:00';
+  s.apts = ['KSBA', 'KSDM', 'MMSF', 'MMLT', '', ''];
+  s.ete = ['', '1:30', '1:20', '2:40', '', ''];
+  s.gal = ['', '17.0', '12.8', '26.4', '', ''];
+  s.turn = ['', '0:45', '1:30', '0:45', '0:45', '0:45'];
+  s.tnote = ['', 'pickup passengers', 'topoff; clear customs', '', '', ''];
+  s.arrive0Note = 'meet planeside';
+  s.route = ['', 'file and fly IFR on this leg', 'avoid 4 restricted areas', '', '', ''];
+  return s;
+}
+function sanitize(x){
+  const b = blankState();
+  if (!x || typeof x !== 'object') return b;
+  const out = Object.assign({}, b);
+  ['wheels','travel','pre','fuel','post','ground','arrive0Note','actTach','actFuel'].forEach(k => {
+    if (typeof x[k] === 'string') out[k] = x[k];
+  });
+  ['apts','ete','pat','gal','turn','tnote','route'].forEach(k => {
+    if (Array.isArray(x[k])) out[k] = b[k].map((d, i) => (typeof x[k][i] === 'string' ? x[k][i] : d));
+  });
+  const n = parseInt(x.legs, 10);
+  out.legs = (n >= 1 && n <= MAXLEGS) ? n : b.legs;
+  out.anchor = anchorOk(x.anchor, out.legs) ? x.anchor : 'wu1';
+  out.date = okDate(x.date) ? x.date : tomorrowIso();   // V5 and older schedules have no date: tomorrow
+  if (parseClock(out.wheels) == null) out.wheels = b.wheels;   // an empty wheels-up time makes every clock time blank
+  out.apts = out.apts.map(v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4));
+  out.route = out.route.map(v => String(v == null ? '' : v).slice(0, 200));   // free text now, like the other notes
+  ['ete', 'pat', 'gal', 'turn', 'tnote', 'route'].forEach(k => { out[k][0] = ''; });   // index 0 is unused; keep it identical everywhere
+  return out;
+}
+
+// "1:30" -> 90 · "130" -> 90 · "45" -> 45 · "1.5" -> 90 (decimal hours) · "" -> 0 · junk -> null
+function parseDur(str){
+  const t = String(str == null ? '' : str).trim();
+  if (t === '') return 0;
+  let m = t.match(/^(\d{1,2}):([0-5]\d)$/);
+  if (m) return (+m[1]) * 60 + (+m[2]);
+  if (/^\d+$/.test(t)){
+    if (t.length <= 2) return +t;
+    if (t.length <= 4){
+      const mm = +t.slice(-2), hh = +t.slice(0, -2);
+      return mm < 60 ? hh * 60 + mm : null;
+    }
+    return null;
+  }
+  if (/^\d*\.\d+$/.test(t)) return Math.round(parseFloat(t) * 60);
+  return null;
+}
+function parseClock(str){
+  const m = String(str || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  return (h < 24 && mi < 60) ? h * 60 + mi : null;
+}
+function parseNum(str){
+  const t = String(str == null ? '' : str).trim();
+  if (t === '') return 0;
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(t)) return null;
+  return parseFloat(t);
+}
+function fmtDur(min){
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + ':' + String(m).padStart(2, '0');
+}
+function fmtClock(min){
+  const day = Math.floor(min / 1440);
+  const m = ((min % 1440) + 1440) % 1440;
+  const h24 = Math.floor(m / 60), mi = m % 60;
+  const ap = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return { t: h12 + ':' + String(mi).padStart(2, '0') + ' ' + ap, day: day };
+}
+
+const wxHistUrl = id => 'https://aviationweather.gov/data/metar/?id=' + id + '&hours=72';
+const wxFcstUrl = id => 'https://www.wunderground.com/forecast/' + id + '?cm_ven=localwx_10day';
+const skyvUrl = (a, b) => 'https://skyvector.com/?chart=301&zoom=9&fpl=' + a + '%20' + b;
+const validId = id => typeof id === 'string' && id.length >= 3;
+
+// ---- dates and time zones (V6) ----
+// The math runs on airport 1's clock ("home"). With the date fixed, that is UTC shifted by one constant, so
+// durations stay exact; each airport's times are shown in its own local time (home time + its offset difference).
+// Zones come from airport-tz.json (airport code -> IANA zone; built from OurAirports coordinates with
+// timezonefinder, North America and all US). The browser works out each zone's UTC offset for the date, DST included.
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WDAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const isoOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+function tomorrowIso(){ const d = new Date(); d.setDate(d.getDate() + 1); return isoOf(d); }
+function okDate(v){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+}
+function fmtDay(iso){   // "Fri 16-Oct-2026"
+  if (!okDate(iso)) return '';
+  const [y, m, d] = iso.split('-').map(Number), w = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return WDAY[w] + ' ' + String(d).padStart(2, '0') + '-' + MON[m - 1] + '-' + y;
+}
+let TZ = null;   // airport code -> IANA zone, once airport-tz.json has loaded
+function setTzTable(doc){
+  const t = {};
+  Object.keys((doc && doc.z) || {}).forEach(zone => { String(doc.z[zone]).split(' ').forEach(c => { if (c) t[c] = zone; }); });
+  TZ = t;
+}
+const zoneFmt = {};
+function zoneOffset(zone, iso){   // minutes east of UTC in that zone on that date (taken at 19:00 UTC, midday in the Americas)
+  let f = zoneFmt[zone];
+  if (!f){
+    try { f = zoneFmt[zone] = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }); }
+    catch (e) { return null; }
+  }
+  const [y, m, d] = iso.split('-').map(Number), t = Date.UTC(y, m - 1, d, 19, 0);
+  const p = {};
+  f.formatToParts(new Date(t)).forEach(x => { p[x.type] = x.value; });
+  return Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute) - t) / 60000);
+}
+const fmtUtc = off => 'UTC' + (off < 0 ? '\u2212' : '+') + Math.floor(Math.abs(off) / 60) + (Math.abs(off) % 60 ? ':' + String(Math.abs(off) % 60).padStart(2, '0') : '');
+const fmtDiff = d => (d < 0 ? '\u2212' : '+') + Math.floor(Math.abs(d) / 60) + (Math.abs(d) % 60 ? ':' + String(Math.abs(d) % 60).padStart(2, '0') : '') + 'h';
+// per airport k (0 = airport 1 = home): zone, UTC offset, d = minutes ahead of home; multi = some airport differs
+function tzInfo(s){
+  const N = s.legs, date = okDate(s.date) ? s.date : tomorrowIso(), out = { k: [], multi: false };
+  for (let k = 0; k <= N; k++){
+    const id = s.apts[k] || '', zone = (TZ && id) ? (TZ[id] || null) : null;
+    const off = zone ? zoneOffset(zone, date) : null;
+    out.k[k] = { id: id, zone: zone, off: off, d: 0, unknown: !!TZ && validId(id) && off == null };
+  }
+  const h = out.k[0].off;
+  if (h != null) out.k.forEach(z => { if (z.off != null){ z.d = z.off - h; if (z.d) out.multi = true; } });
+  return out;
+}
+// which airport a clock time happens at
+function anchorApt(key, N){
+  if (key === 'home') return 0;
+  if (key === 'dest') return N;
+  const n = +key.replace(/\D/g, '');
+  return key.startsWith('wu') ? n - 1 : n;
+}
+
+// ---- "plan around" anchor: the one clock time the user types; everything else works out from it ----
+function anchorKeys(N){
+  const k = ['home'];
+  for (let i = 1; i <= N; i++) k.push('wu' + i, 'arr' + i);
+  k.push('dest');
+  return k;
+}
+function anchorOk(key, N){ return typeof key === 'string' && anchorKeys(N).indexOf(key) >= 0; }
+function anchorLabel(key, s){
+  const id = k => (s.apts[k] ? ' (' + s.apts[k] + ')' : '');
+  if (key === 'home') return 'Depart Home';
+  if (key === 'dest') return 'Arrive destination';
+  const n = +key.replace(/\D/g, '');
+  return key.startsWith('wu') ? 'Wheels Up ' + n + id(n - 1) : 'Arrive ' + n + id(n);
+}
+function anchorValue(c, key){
+  if (key === 'home') return c.depart;
+  if (key === 'dest') return c.home;
+  const n = +key.replace(/\D/g, '');
+  return key.startsWith('wu') ? c.wheels[n] : c.arrive[n];
+}
+const hhmm = m => { const x = ((m % 1440) + 1440) % 1440; return String(Math.floor(x / 60)).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0'); };
+
+// Work the day out with Wheels Up 1 at 0, then slide it so the anchor lands on the typed time.
+// The typed time is local at the anchor's airport; c.* times are on airport 1's clock; c.tz says how to show each.
+function compute(s){
+  const A = parseClock(s.wheels), key = anchorOk(s.anchor, s.legs) ? s.anchor : 'wu1', z = tzInfo(s);
+  const rel = anchorValue(chain(s, 0), key);
+  const c = chain(s, (A == null || rel == null) ? null : A - z.k[anchorApt(key, s.legs)].d - rel);
+  c.tz = z;
+  return c;
+}
+function chain(s, W){
+  const N = s.legs;
+  const add = (...x) => x.some(v => v == null) ? null : x.reduce((p, q) => p + q, 0);
+  const neg = v => v == null ? null : -v;
+  const c = { arrive: [], wheels: [], ete: [], pat: [] };
+  c.arrive0 = add(W, neg(parseDur(s.fuel)), neg(parseDur(s.pre)));
+  c.depart = add(c.arrive0, neg(parseDur(s.travel)));
+  let t = W;
+  c.wheels[1] = W;
+  let air = 0, gal = 0;
+  for (let i = 1; i <= N; i++){
+    const ete = parseDur(s.ete[i]), pat = parseDur(s.pat[i]);
+    c.ete[i] = ete; c.pat[i] = pat;
+    c.arrive[i] = add(t, ete, pat);
+    air = add(air, ete, pat);
+    gal = add(gal, parseNum(s.gal[i]));
+    if (i < N){
+      t = add(c.arrive[i], parseDur(s.turn[i]));
+      c.wheels[i + 1] = t;
+    }
+  }
+  c.home = add(c.arrive[N], parseDur(s.post), parseDur(s.ground));
+  c.planAirMin = air;
+  c.planAir = air == null ? null : air / 60;
+  c.planFuel = gal;
+  return c;
+}
+
+// ---- one row list for the whole schedule: the screen (build) and the iPhone PDF (buildPdf) both draw from it ----
+// row:  { t:'row', label, leg?, ms?, aria?, clock:{ key, fn } | dur:{ f, i }, cmt: null | { tag } | { note:{ f, i, label, ph?, max? } } | { fuel:i } }
+// band: { t:'band', k, cap }   (airport k: 0 = origin, i = destination of leg i)
+const fget = (s, f, i) => (i == null ? s[f] : s[f][i]);
+const fset = (s, f, i, v) => { if (i == null) s[f] = v; else s[f][i] = v; };
+function scheduleRows(s){
+  const N = s.legs, R = [];
+  const clock = (key, label, fn, ms, k) => R.push({ t: 'row', label: label, ms: !!ms || (key != null && s.anchor === key),
+    clock: { key: key, k: k, home: fn, fn: c => { const m = fn(c); return m == null ? null : m + (c.tz ? c.tz.k[k].d : 0); } },
+    cmt: (key != null && s.anchor === key) ? { tag: true } : null });
+  const dur = (label, f, i, cmt, extra) => R.push(Object.assign({ t: 'row', label: label, dur: { f: f, i: i }, cmt: cmt || null }, extra || {}));
+  clock('home', 'Depart Home', c => c.depart, true, 0);
+  dur('Ground travel time', 'travel');
+  R.push({ t: 'band', k: 0, cap: 'Origin' });
+  R.push({ t: 'row', label: 'Arrive at airport', clock: { key: null, k: 0, fn: c => c.arrive0, home: c => c.arrive0 },
+    cmt: { note: { f: 'arrive0Note', label: 'Note for arrival at origin' } } });
+  dur('Preflight', 'pre');
+  dur('Fueling', 'fuel');
+  clock('wu1', 'Wheels Up 1', c => c.wheels[1], true, 0);
+  for (let i = 1; i <= N; i++){
+    dur('ETE', 'ete', i, { note: { f: 'route', i: i, label: 'Route, leg ' + i, ph: 'route (optional)', max: 200 } }, { leg: i, aria: 'ETE ' + i });
+    dur('Pattern / approach', 'pat', i, { fuel: i }, { aria: 'Pattern / approach ' + i });
+    R.push({ t: 'band', k: i, cap: i === N ? 'Destination' : 'Stop ' + i });
+    clock('arr' + i, 'Arrive', c => c.arrive[i], i === N, i);
+    if (i < N){
+      dur('Turnaround', 'turn', i, { note: { f: 'tnote', i: i, label: 'Note for stop ' + i } }, { aria: 'Turnaround ' + i });
+      clock('wu' + (i + 1), 'Wheels Up ' + (i + 1), c => c.wheels[i + 1], true, i);
+    }
+  }
+  dur('Postflight', 'post');
+  dur('Ground', 'ground');
+  clock('dest', 'Arrive destination', c => c.home, true, N);
+  return R;
+}
+// "(10:06 AM KSBA)": airport 1's clock beside a local time, only where that airport's clock differs
+function homeNote(c, s, k, m){
+  if (!c.tz || !c.tz.multi || !c.tz.k[k] || !c.tz.k[k].d || m == null) return '';
+  const f = fmtClock(m);
+  return '(' + f.t + (f.day ? ' ' + (f.day > 0 ? '+' : '\u2212') + Math.abs(f.day) + 'd' : '') + ' ' + (s.apts[0] || 'home') + ')';
+}
+// band tag: "UTC−7 · +1h" where clocks differ, "zone unknown" when the airport isn't in the table
+function bandZone(c, k){
+  const z = c.tz && c.tz.k[k];
+  if (!z) return { text: '', warn: false };
+  if (z.unknown) return { text: 'zone unknown', warn: true };
+  if (!c.tz.multi || z.off == null) return { text: '', warn: false };
+  return { text: fmtUtc(z.off) + (z.d ? ' \u00b7 ' + fmtDiff(z.d) : ''), warn: false };
+}
+
+// ---- PDF of the schedule (used on iPhone/iPad, where window.print() is unreliable). White page, one sheet. ----
+// Same grid as the screen and the print view: label | time | comment, gray airport bands, shaded calculated times.
+function pdfFileName(s){
+  const ids = s.apts.slice(0, s.legs + 1).filter(Boolean);
+  return 'Flight_Schedule' + (ids.length ? '_' + ids.join('-') : '') + (okDate(s.date) ? '_' + fmtDay(s.date).slice(4) : '') + '.pdf';
+}
+function buildPdf(JsPDF, s){
+  const c = compute(s);
+  const doc = new JsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
+  doc.setProperties({ title: pdfFileName(s).replace(/\.pdf$/, '').replace(/_/g, ' '), author: 'GeezerGeek Pilot' });
+  const PW = 612, PH = 792, M = 34, PAD = 10, CW = PW - 2 * M, GAP = 8;
+  const INK = [20, 23, 28], MUTED = [90, 98, 112], AMBER = [163, 90, 0], TEAL = [11, 107, 102], BLUE = [31, 95, 191];
+  const RULE = [170, 177, 188], HAIR = [228, 231, 235], SHADE = [236, 238, 241], BAND = [223, 226, 230], ORANGE = [245, 166, 35];
+  const safe = t => String(t == null ? '' : t).replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+  const A = parseClock(s.wheels);
+  // column geometry (inside a box): label 1fr | time fixed | comment 1.4fr, like the screen
+  const x0 = M + PAD, x1 = M + CW - PAD, IW = x1 - x0, TW = 84;
+  const LW = (IW - TW - 2 * GAP) / 2.4, tx = x0 + LW + GAP, cx = tx + TW + GAP, CWc = x1 - cx;
+
+  // turn the shared row list into drawable rows
+  const durTxt = v => { const m = parseDur(v); return m == null ? '--' : fmtDur(m); };
+  const sch = scheduleRows(s).map(d => {
+    if (d.t === 'band'){ const bz = bandZone(c, d.k); return { type: 'band', id: s.apts[d.k], cap: d.cap, zone: bz.text, warn: bz.warn }; }
+    const r = { type: 'row', label: d.label, leg: d.leg, ms: d.ms };
+    if (d.clock){
+      if (d.clock.key != null && s.anchor === d.clock.key){ r.cell = 'anchor'; r.val = A == null ? '--' : fmtClock(A).t; }
+      else { const m = d.clock.fn(c); r.cell = 'calc'; if (m == null) r.val = '--'; else { const f = fmtClock(m); r.val = f.t; r.day = f.day; } }
+      r.home = homeNote(c, s, d.clock.k, d.clock.home(c));
+    } else { r.cell = 'in'; r.val = durTxt(fget(s, d.dur.f, d.dur.i)); }
+    if (d.cmt){
+      if (d.cmt.tag) r.tag = '<< start here';
+      else if (d.cmt.note) r.note = String(fget(s, d.cmt.note.f, d.cmt.note.i) || '').trim();
+      else if (d.cmt.fuel) r.fuel = String(s.gal[d.cmt.fuel] || '').trim();
+    }
+    return r;
+  });
+  const variance = (actStr, planVal) => {
+    if (!String(actStr || '').trim() || !planVal) return null;
+    const a = parseNum(actStr);
+    if (a == null) return null;
+    const p = (a - planVal) / planVal * 100;
+    return { text: (p > 0 ? '+' : '') + Math.round(p) + '%', color: p > 0 ? AMBER : (p < 0 ? TEAL : MUTED) };
+  };
+  const plan = [
+    { type: 'row', label: 'Plan airtime', ms: true, cell: 'calc', val: c.planAir == null ? '--' : c.planAir.toFixed(1) + ' h', sub: c.planAir == null ? '' : '(' + fmtDur(c.planAirMin) + ')' },
+    { type: 'row', label: 'Actual tach time', cell: 'in', val: String(s.actTach || '').trim(), vari: variance(s.actTach, c.planAir) },
+    { type: 'row', label: 'Plan fuel', ms: true, cell: 'calc', blue: true, val: c.planFuel == null ? '--' : c.planFuel.toFixed(1) + ' gal' },
+    { type: 'row', label: 'Actual fuel (gal)', cell: 'in', blue: true, val: String(s.actFuel || '').trim(), vari: variance(s.actFuel, c.planFuel) }
+  ];
+
+  // size: notes may wrap to two lines; scale everything so the whole day fits on one page
+  const BANDW = 1.35, TITLEW = 1.5;
+  function layout(fs){
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(fs * 0.92);
+    sch.forEach(r => {
+      r.lines = r.note ? doc.splitTextToSize(safe(r.note), CWc - 4) : [];
+      if (r.lines.length > 2){ r.lines = r.lines.slice(0, 2); r.lines[1] = r.lines[1].replace(/.{0,3}$/, '...'); }
+      r.w = r.type === 'band' ? BANDW : (r.lines.length > 1 ? 1.6 : 1);
+    });
+    plan.forEach(r => { r.w = 1; });
+    const units = a => a.reduce((t, x) => t + x.w, 0);
+    const fixed = 30 + 4 * PAD + 8 + 20;
+    const u = Math.min(16, (PH - 2 * M - fixed) / (TITLEW + units(sch) + TITLEW + units(plan)));
+    return { u: u, fs: Math.max(6.5, Math.min(10.5, u * 0.68)), units: units };
+  }
+  let L = layout(9.5);
+  L = layout(L.fs);
+  L = layout(L.fs);   // settle: wrapping depends on font size, font size on row count
+  const u = L.u, fs = L.fs, units = L.units;
+
+  let y = M;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor.apply(doc, INK);
+  doc.text("Day's Flight Schedule", M, y + 13);
+  if (okDate(s.date)){
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor.apply(doc, MUTED);
+    doc.text(fmtDay(s.date), M + CW, y + 13, { align: 'right' });
+  }
+  y += 30;
+
+  function cellText(r, cy, h){
+    const by = cy + h * 0.5 - u * 0.43, bh = u * 0.86, base = by + bh * 0.7;
+    if (r.cell === 'calc' || r.cell === 'anchor'){
+      doc.setFillColor.apply(doc, r.cell === 'anchor' ? ORANGE : SHADE);
+      doc.roundedRect(tx, by, TW, bh, 2, 2, 'F');
+    }
+    doc.setFont('courier', 'bold'); doc.setFontSize(fs * 1.05);
+    doc.setTextColor.apply(doc, r.cell === 'anchor' ? [0, 0, 0] : (r.blue ? BLUE : (r.cell === 'calc' ? AMBER : INK)));
+    doc.text(safe(r.val), tx + TW - 5, base, { align: 'right' });
+    if (r.day){
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(fs * 0.75); doc.setTextColor.apply(doc, MUTED);
+      doc.text((r.day > 0 ? '+' : '-') + Math.abs(r.day) + 'd', tx + 4, base);
+    }
+    return base;
+  }
+  function drawBox(title, items){
+    const h = 2 * PAD + u * TITLEW + units(items) * u;
+    doc.setDrawColor.apply(doc, RULE); doc.setLineWidth(0.7);
+    doc.roundedRect(M, y, CW, h, 6, 6, 'S');
+    let cy = y + PAD;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(fs * 1.05); doc.setTextColor.apply(doc, INK);
+    doc.text(title, x0, cy + u * 0.9);
+    cy += u * TITLEW;
+    items.forEach(r => {
+      const rh = r.w * u;
+      if (r.type === 'band'){
+        const bh = rh - u * 0.2, by = cy + u * 0.12;
+        doc.setFillColor.apply(doc, BAND);
+        doc.roundedRect(x0 - 5, by, IW + 10, bh, 3, 3, 'F');
+        const base = by + bh * 0.68;
+        doc.setFont('courier', 'bold'); doc.setFontSize(fs * 1.3); doc.setTextColor.apply(doc, INK);
+        const id = safe(r.id || '----');
+        doc.text(id, x0, base);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(fs * 0.85); doc.setTextColor.apply(doc, MUTED);
+        const capX = x0 + Math.max(doc.getTextWidth('MMMMMM') * 1.05, 52);
+        doc.text(safe(r.cap), capX, base);
+        if (r.zone){
+          const zx = capX + doc.getTextWidth(safe(r.cap) + '   ');
+          if (r.warn){ doc.setFont('helvetica', 'bold'); doc.setTextColor.apply(doc, AMBER); }
+          doc.text(safe(r.zone.replace(/\u2212/g, '-').replace(/\u00b7/g, '-')), zx, base);
+          doc.setFont('helvetica', 'normal'); doc.setTextColor.apply(doc, MUTED);
+        }
+        if (validId(r.id)){
+          doc.setFontSize(fs * 0.9); doc.setTextColor.apply(doc, TEAL);
+          const wF = doc.getTextWidth('Wx Forecast'), wH = doc.getTextWidth('Wx History');
+          const fx = x1 - wF, hx = fx - 12 - wH;
+          doc.textWithLink('Wx History', hx, base, { url: wxHistUrl(r.id) });
+          doc.textWithLink('Wx Forecast', fx, base, { url: wxFcstUrl(r.id) });
+        }
+      } else {
+        const base = cellText(r, cy, rh);
+        // label
+        doc.setFontSize(fs);
+        if (r.leg){
+          doc.setFont('helvetica', 'bold'); doc.setTextColor.apply(doc, AMBER);
+          const lt = 'Leg ' + r.leg; doc.text(lt, x0, base);
+          const lw = doc.getTextWidth(lt + ' ');
+          doc.setFont('helvetica', 'normal'); doc.setTextColor.apply(doc, INK); doc.text('ETE', x0 + lw, base);
+        } else {
+          doc.setFont('helvetica', r.ms ? 'bold' : 'normal'); doc.setTextColor.apply(doc, INK);
+          doc.text(safe(r.label), x0, base);
+        }
+        // comment column
+        let hx = cx;
+        if (r.tag){
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(fs * 0.9); doc.setTextColor.apply(doc, AMBER);
+          doc.text(r.tag, cx, base);
+          hx = cx + doc.getTextWidth(r.tag + '  ');
+        }
+        if (r.home){
+          doc.setFont('courier', 'normal'); doc.setFontSize(fs * 0.95); doc.setTextColor.apply(doc, MUTED);
+          doc.text(safe(r.home.replace(/\u2212/g, '-')), hx, base);
+        }
+        if (r.tag || r.home){ /* drawn above */ } else if (r.lines && r.lines.length){
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(fs * 0.92); doc.setTextColor.apply(doc, INK);
+          if (r.lines.length === 1) doc.text(r.lines[0], cx, base);
+          else { const lh = fs * 1.08; doc.text(r.lines[0], cx, cy + rh * 0.5 - lh * 0.15); doc.text(r.lines[1], cx, cy + rh * 0.5 + lh * 0.85); }
+        } else if (r.fuel != null && r.type === 'row' && 'fuel' in r){
+          doc.setFont('courier', 'bold'); doc.setFontSize(fs * 1.05); doc.setTextColor.apply(doc, BLUE);
+          doc.text(safe(r.fuel), x1 - 5, base, { align: 'right' });
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(fs * 0.9); doc.setTextColor.apply(doc, MUTED);
+          doc.text('Plan fuel', x1 - 5 - fs * 4.4, base, { align: 'right' });
+        } else if (r.sub){
+          doc.setFont('courier', 'normal'); doc.setFontSize(fs * 0.95); doc.setTextColor.apply(doc, MUTED);
+          doc.text(safe(r.sub), cx, base);
+        } else if (r.vari){
+          doc.setFont('courier', 'bold'); doc.setFontSize(fs); doc.setTextColor.apply(doc, r.vari.color);
+          doc.text(r.vari.text, cx, base);
+        }
+        // hairline under the row, like the sheet's gridlines
+        doc.setDrawColor.apply(doc, HAIR); doc.setLineWidth(0.5);
+        doc.line(x0, cy + rh, x1, cy + rh);
+      }
+      cy += rh;
+    });
+    y += h;
+  }
+  drawBox('Schedule', sch);
+  y += 8;
+  drawBox('Plan vs. actual', plan);
+
+  // credit line (same as the on-screen footer)
+  y += 14;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  const parts = [['Wayne McClelland, ', null], ['GeezerGeek Pilot', 'https://youtube.com/@GeezerGeekPilot'], [', ', null], ['Reference Materials', 'https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview']];
+  const total = parts.reduce((t, p) => t + doc.getTextWidth(p[0]), 0);
+  let px = (PW - total) / 2;
+  parts.forEach(p => {
+    if (p[1]){ doc.setTextColor.apply(doc, TEAL); doc.textWithLink(p[0], px, y, { url: p[1] }); }
+    else { doc.setTextColor.apply(doc, MUTED); doc.text(p[0], px, y); }
+    px += doc.getTextWidth(p[0]);
+  });
+  return doc;
+}
+// ---- schedule <-> link payload ----
+// Current links: https://days-flight-schedule.netlify.app/?s=<payload>, where payload is
+//   "z" + base64url(deflate-raw(JSON))  (browsers with CompressionStream), or
+//   "j" + base64url(JSON)               (fallback).
+// Older links used "#d=" + base64url(JSON); those still open. The fragment form was dropped because
+// macOS/iOS Messages cut the link off at "#d", leaving the payload as plain text.
+function stateArr(s){
+  const N = s.legs, part = (a, from, to) => a.slice(from, to + 1);
+  return ['1', N, s.wheels, s.travel, s.pre, s.fuel, s.post, s.ground, s.arrive0Note,
+    part(s.apts, 0, N), part(s.ete, 1, N), part(s.pat, 1, N), part(s.gal, 1, N), part(s.turn, 1, N - 1), part(s.tnote, 1, N - 1),
+    s.actTach, s.actFuel, part(s.route, 1, N), null, s.anchor, s.date];
+}
+function b64urlFromBytes(bytes){
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function bytesFromB64url(t){
+  let b = String(t).replace(/-/g, '+').replace(/_/g, '/');
+  while (b.length % 4) b += '=';
+  return Uint8Array.from(atob(b), c => c.charCodeAt(0));
+}
+async function pipeBytes(bytes, stream){
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+  return new Uint8Array(await out.arrayBuffer());
+}
+async function encodeState(s){
+  const bytes = new TextEncoder().encode(JSON.stringify(stateArr(s)));
+  if (typeof CompressionStream === 'function'){
+    try { return 'z' + b64urlFromBytes(await pipeBytes(bytes, new CompressionStream('deflate-raw'))); } catch (e) {}
+  }
+  return 'j' + b64urlFromBytes(bytes);
+}
+async function decodeLinkPayload(payload){   // new "?s=" payload -> state or null
+  try {
+    const kind = payload.charAt(0), body = payload.slice(1);
+    let bytes = bytesFromB64url(body);
+    if (kind === 'z'){
+      if (typeof DecompressionStream !== 'function') return null;
+      bytes = await pipeBytes(bytes, new DecompressionStream('deflate-raw'));
+    } else if (kind !== 'j') return null;
+    return stateFromArr(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch (e) { return null; }
+}
+function decodeState(payload){   // legacy "#d=" payload -> state or null
+  try { return stateFromArr(JSON.parse(new TextDecoder().decode(bytesFromB64url(payload)))); }
+  catch (e) { return null; }
+}
+function stateFromArr(arr){
+  try {
+    if (!Array.isArray(arr) || arr[0] !== '1') return null;
+    const N = parseInt(arr[1], 10);
+    if (!(N >= 1 && N <= MAXLEGS)) return null;
+    const x = blankState();
+    x.legs = N;
+    const str = v => (typeof v === 'string' ? v : '');
+    x.wheels = str(arr[2]); x.travel = str(arr[3]); x.pre = str(arr[4]); x.fuel = str(arr[5]); x.post = str(arr[6]); x.ground = str(arr[7]);
+    x.arrive0Note = str(arr[8]).slice(0, 60);
+    const put = (dst, src, from, max) => { (Array.isArray(src) ? src : []).forEach((v, i) => { if (from + i <= MAXLEGS) dst[from + i] = str(v).slice(0, max || 12); }); };
+    put(x.apts, arr[9], 0, 4); put(x.ete, arr[10], 1); put(x.pat, arr[11], 1); put(x.gal, arr[12], 1); put(x.turn, arr[13], 1); put(x.tnote, arr[14], 1, 60);
+    x.actTach = str(arr[15]).slice(0, 12); x.actFuel = str(arr[16]).slice(0, 12);
+    put(x.route, arr[17], 1, 200);
+    x.anchor = str(arr[19]) || 'wu1';   // links made before the anchor picker have none: Wheels Up 1
+    x.date = str(arr[20]);   // links made before V6 have none: sanitize makes it tomorrow
+    // arr[18], if present, is a leftover points cache from an older version of this app; no longer used.
+    return sanitize(x);
+  } catch (e) { return null; }
+}
+/*END CORE*/
+
+/* ------------------------------ UI ------------------------------ */
+(function(){
+  const $ = (id) => document.getElementById(id);
+  let hadCache = false;
+  let state = load();
+  let ui = null;
+
+  function load(){
+    try { const raw = localStorage.getItem(KEY); if (raw){ hadCache = true; return sanitize(JSON.parse(raw)); } } catch (e) {}
+    return exampleState();
+  }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function el(tag, cls, html){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  // kind: dur | num | time | apt | note
+  function mkInput(kind, get, set, label){
+    const i = document.createElement('input');
+    i.className = 'fld';
+    i.setAttribute('aria-label', label);
+    i.autocomplete = 'off'; i.spellcheck = false;
+    if (kind === 'dur'){ i.type = 'text'; i.inputMode = 'numeric'; i.placeholder = '0:00'; }
+    else if (kind === 'num'){ i.type = 'text'; i.inputMode = 'decimal'; i.placeholder = '0.0'; }
+    else if (kind === 'time'){ i.type = 'time'; i.classList.add('anchor'); }
+    else if (kind === 'apt'){ i.type = 'text'; i.placeholder = 'ICAO'; i.maxLength = 4; i.autocapitalize = 'characters'; i.classList.add('apt-id'); }
+    else { i.type = 'text'; i.placeholder = 'note (optional)'; i.maxLength = 60; i.classList.add('note'); }
+    i.value = get() || '';
+    const check = () => {
+      const v = i.value;
+      let ok = true;
+      if (kind === 'dur') ok = parseDur(v) != null;
+      else if (kind === 'num') ok = parseNum(v) != null;
+      i.classList.toggle('bad', !ok);
+    };
+    i.addEventListener('input', () => {
+      if (kind === 'apt') i.value = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      set(i.value); check(); recompute();
+    });
+    if (kind === 'dur') i.addEventListener('blur', () => {
+      const m = parseDur(i.value);
+      if (i.value.trim() !== '' && m != null){ i.value = fmtDur(m); set(i.value); }
+      recompute();
+    });
+    check();
+    return i;
+  }
+
+  function reg(node, fn){ ui.clocks.push({ node: node, fn: fn }); }
+  function setClock(node, m){
+    node.textContent = '';
+    if (m == null){ node.textContent = '—'; return; }
+    const f = fmtClock(m);
+    if (f.day){   // day change sits at the left of the shaded cell, so the time stays on the right edge
+      const d = el('span', 'day');
+      d.textContent = (f.day > 0 ? '+' : '−') + Math.abs(f.day) + 'd';
+      d.title = (f.day > 0 ? '+' : '−') + Math.abs(f.day) + (Math.abs(f.day) === 1 ? ' day' : ' days');
+      node.appendChild(d);
+    }
+    node.appendChild(document.createTextNode(f.t));
+  }
+
+  // ---- V3 grid rows: label | time | comment ----
+  // label: string, or a node (e.g. "Leg 1" + " ETE"). time: input or calc cell. cmt: node or null.
+  function gRow(label, time, cmt, opts){
+    opts = opts || {};
+    const r = el('div', 'grow' + (opts.ms ? ' ms' : '') + (opts.fuel ? ' fuel' : ''));
+    const l = el('div', 'glbl');
+    if (typeof label === 'string') l.textContent = label; else l.appendChild(label);
+    const t = el('div', 'gtime'); if (time) t.appendChild(time);
+    const c = el('div', 'gcmt'); if (cmt) c.appendChild(cmt);
+    r.append(l, t, c);
+    return r;
+  }
+  function calcCell(fn){ const s = el('span', 'calc'); reg(s, fn); return s; }
+  function noteIn(get, set, label, ph, max){
+    const i = mkInput('note', get, set, label);
+    if (ph) i.placeholder = ph;
+    if (max) i.maxLength = max;
+    // paper copy: inputs can't wrap, so print shows this plain-text twin instead
+    const w = el('div', 'notewrap');
+    const t = el('span', 'ptext'); t.textContent = i.value;
+    i.addEventListener('input', () => { t.textContent = i.value; });
+    w.append(i, t);
+    return w;
+  }
+  function durIn(label, get, set){ return mkInput('dur', get, set, label); }
+
+  // ---- "plan around" picker ----
+  function buildAnchorSel(){
+    const sel = $('anchorSel');
+    sel.innerHTML = '';
+    anchorKeys(state.legs).forEach(k => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = anchorLabel(k, state);
+      sel.appendChild(o);
+    });
+    sel.value = state.anchor;
+  }
+  function labelAnchorSel(){
+    Array.from($('anchorSel').options).forEach(o => { o.textContent = anchorLabel(o.value, state); });
+  }
+  // move the anchor without moving the schedule: the new anchor starts at the time it already showed
+  function setAnchor(key){
+    const c = compute(state), m = anchorValue(c, key);
+    if (m != null) state.wheels = hhmm(m + c.tz.k[anchorApt(key, state.legs)].d);   // the typed time is local at that airport
+    state.anchor = key;
+  }
+  $('anchorSel').addEventListener('change', e => {
+    setAnchor(e.target.value);
+    save(); build();
+  });
+
+  // ---- date of the flying day (V6): sets each airport's UTC offset; default tomorrow ----
+  function showDate(){
+    if (!okDate(state.date)) state.date = tomorrowIso();
+    $('dateTxt').textContent = fmtDay(state.date);
+    $('dayHead').textContent = fmtDay(state.date);
+    if ($('dateIn').value !== state.date) $('dateIn').value = state.date;
+  }
+  $('dateIn').addEventListener('change', e => {
+    state.date = okDate(e.target.value) ? e.target.value : tomorrowIso();   // a cleared field goes back to tomorrow
+    recompute(); updateNameHint();
+  });
+  $('dateIn').addEventListener('click', e => {   // desktop: open the calendar on any click, not just the icon
+    try { if (typeof e.target.showPicker === 'function') e.target.showPicker(); } catch (err) {}
+  });
+
+  // airport band: ICAO + caption on the left, weather links on the right
+  function aptBand(k, caption){
+    const box = el('div', 'band');
+    const inp = mkInput('apt', () => state.apts[k], v => { state.apts[k] = v; }, caption + ' airport');
+    const cap = el('span', 'cap'); cap.textContent = caption;
+    const links = el('div', 'links');
+    const hist = el('a'); hist.textContent = 'Wx History'; hist.target = '_blank'; hist.rel = 'noopener';
+    const fc = el('a'); fc.textContent = 'Wx Forecast'; fc.target = '_blank'; fc.rel = 'noopener';
+    links.append(hist, fc);
+    const tz = el('span', 'tz');
+    box.append(inp, cap, tz, links);
+    ui.apts[k] = { hist: hist, fc: fc, tz: tz };
+    return box;
+  }
+  function legLabel(i){
+    const f = document.createDocumentFragment();
+    const n = el('span', 'legname'); n.textContent = 'Leg ' + i;
+    f.append(n, document.createTextNode(' ETE'));
+    return f;
+  }
+  function fuelCell(i){
+    const w = el('div', 'fuelcell');
+    const l = el('span', 'flbl', '<span class="long">Plan </span>fuel');
+    const inp = mkInput('num', () => state.gal[i], v => { state.gal[i] = v; }, 'Plan fuel, leg ' + i + ', gallons');
+    w.append(l, inp);
+    return w;
+  }
+
+  // one screen row from a scheduleRows() entry (the same list the PDF draws)
+  function rowFrom(d){
+    let time;
+    if (d.clock){
+      if (d.clock.key != null && state.anchor === d.clock.key)
+        time = mkInput('time', () => state.wheels, v => { state.wheels = v; }, anchorLabel(d.clock.key, state) + ' (start here)');
+      else time = calcCell(d.clock.fn);
+    } else {
+      time = durIn(d.aria || d.label, () => fget(state, d.dur.f, d.dur.i), v => fset(state, d.dur.f, d.dur.i, v));
+    }
+    let cmt = null;
+    if (d.clock && d.clock.k > 0){   // tag (if this is the anchor) + "(10:06 AM KSBA)" where the clock differs
+      cmt = document.createDocumentFragment();
+      if (d.cmt && d.cmt.tag){ const tg = el('span', 'tag'); tg.textContent = '\u25C2 start here'; cmt.appendChild(tg); }
+      const h = el('span', 'hometime'); cmt.appendChild(h);
+      ui.homes.push({ node: h, k: d.clock.k, fn: d.clock.home });
+    }
+    else if (d.cmt && d.cmt.tag){ cmt = el('span', 'tag'); cmt.textContent = '\u25C2 start here'; }
+    else if (d.cmt && d.cmt.note){
+      const n = d.cmt.note;
+      cmt = noteIn(() => fget(state, n.f, n.i), v => fset(state, n.f, n.i, v), n.label, n.ph, n.max);
+    }
+    else if (d.cmt && d.cmt.fuel) cmt = fuelCell(d.cmt.fuel);
+    return gRow(d.leg ? legLabel(d.leg) : d.label, time, cmt, { ms: d.ms });
+  }
+
+  function build(){
+    ui = { clocks: [], apts: [], vars: {}, homes: [] };
+    const T = $('timeline');
+    T.innerHTML = '';
+    scheduleRows(state).forEach(d => T.append(d.t === 'band' ? aptBand(d.k, d.cap) : rowFrom(d)));
+    buildSummary();
+    buildSeg();
+    buildAnchorSel();
+    recompute();
+  }
+
+  function buildSummary(){
+    const S = $('summary');
+    S.innerHTML = '';
+    const planAir = el('span', 'calc'); ui.planAir = planAir;
+    const airSub = el('span', 'sub'); ui.planAirSub = airSub;
+    S.append(gRow('Plan airtime', planAir, airSub, { ms: true }));
+    const tach = mkInput('num', () => state.actTach, v => { state.actTach = v; }, 'Actual tach time, hours');
+    const vt = el('span', 'var'); ui.vars.tach = vt;
+    S.append(gRow('Actual tach time', tach, vt));
+    const planFuel = el('span', 'calc'); ui.planFuel = planFuel;
+    S.append(gRow('Plan fuel', planFuel, null, { ms: true, fuel: true }));
+    const af = mkInput('num', () => state.actFuel, v => { state.actFuel = v; }, 'Actual fuel, gallons');
+    const vf = el('span', 'var'); ui.vars.fuel = vf;
+    S.append(gRow('Actual fuel (gal)', af, vf, { fuel: true }));
+  }
+
+  function buildSeg(){
+    const seg = $('legSeg');
+    seg.innerHTML = '';
+    for (let n = 1; n <= MAXLEGS; n++){
+      const b = el('button');
+      b.type = 'button'; b.textContent = n;
+      b.setAttribute('aria-label', n + (n === 1 ? ' leg' : ' legs'));
+      b.setAttribute('aria-pressed', n === state.legs ? 'true' : 'false');
+      if (n === state.legs) b.classList.add('on');
+      b.addEventListener('click', () => {
+        if (state.legs === n) return;
+        if (!anchorOk(state.anchor, n)){
+          const was = anchorLabel(state.anchor, state);
+          setAnchor('wu1');
+          const t = parseClock(state.wheels);
+          showNotice(was + ' is gone with ' + n + (n === 1 ? ' leg' : ' legs') + ', so you now plan around Wheels Up 1' + (t == null ? '.' : ', kept at ' + fmtClock(t).t + '.'));
+        }
+        state.legs = n; save(); build();
+      });
+      seg.appendChild(b);
+    }
+  }
+
+  function setLink(a, url){
+    if (url){ a.href = url; a.classList.remove('off'); a.removeAttribute('aria-disabled'); }
+    else { a.removeAttribute('href'); a.classList.add('off'); a.setAttribute('aria-disabled', 'true'); }
+  }
+  function variance(node, actStr, plan, unitPlanZero){
+    node.className = 'var'; node.textContent = '';
+    if ((actStr || '').trim() === '') return;
+    const act = parseNum(actStr);
+    if (act == null || !plan) return;
+    const p = (act - plan) / plan * 100;
+    node.textContent = (p > 0 ? '+' : '') + Math.round(p) + '%';
+    node.classList.add(p > 0 ? 'over' : (p < 0 ? 'under' : 'x'));
+  }
+
+  // ---- day at a glance: depart home, then each airport with its ETA, then arrive home ----
+  function drawGlance(c){
+    const G = $('glance'), N = state.legs;
+    G.innerHTML = '';
+    G.style.setProperty('--n', N + 1);
+    G.classList.toggle('many', N + 1 >= 5 && window.innerWidth <= 480);
+    const timeNode = m => {
+      const t = el('div', 'gt');
+      if (m == null){ t.classList.add('none'); t.textContent = '--:--'; return t; }
+      const f = fmtClock(m), parts = f.t.split(' ');
+      const hm = el('span'); hm.textContent = parts[0];
+      const ap = el('span', 'ap'); ap.textContent = parts[1] || '';
+      t.append(hm, ap);
+      if (f.day > 0){ const d = el('span', 'dd'); d.textContent = '+' + f.day; t.appendChild(d); }
+      return t;
+    };
+    for (let k = 0; k <= N; k++){
+      const first = k === 0, last = k === N, end = first || last;
+      const st = el('div', 'gs' + (end ? ' end' : ''));
+      const raw = first ? c.depart : last ? c.home : c.arrive[k], zd = c.tz.k[k].d;
+      st.appendChild(timeNode(raw == null ? null : raw + zd));
+      st.appendChild(el('div', 'gd'));
+      const id = String(state.apts[k] || '').trim().toUpperCase();
+      const code = el('div', 'gc' + (id ? '' : ' none')); code.textContent = id || '----';
+      st.appendChild(code);
+      const lbl = el('div', 'gl' + (end ? '' : ' eta')); lbl.textContent = (first ? 'depart home/hotel' : last ? 'arrive home/hotel' : 'ETA') + (zd ? ' ' + fmtDiff(zd) : '');
+      st.appendChild(lbl);
+      G.appendChild(st);
+    }
+  }
+  window.addEventListener('resize', () => { clearTimeout(drawGlance.t); drawGlance.t = setTimeout(() => drawGlance(compute(state)), 150); });
+  function recompute(){
+    const c = compute(state);
+    drawGlance(c);
+    ui.clocks.forEach(x => setClock(x.node, x.fn(c)));
+    ui.homes.forEach(x => { x.node.textContent = homeNote(c, state, x.k, x.fn(c)); });
+    showDate();
+    for (let k = 0; k <= state.legs; k++){
+      const id = state.apts[k], a = ui.apts[k];
+      if (!a) continue;
+      setLink(a.hist, validId(id) ? wxHistUrl(id) : null);
+      setLink(a.fc, validId(id) ? wxFcstUrl(id) : null);
+      const bz = bandZone(c, k);
+      a.tz.textContent = '';
+      if (bz.text){   // "UTC−7 · +1h": phones show only "+1h" (and nothing for airports on airport 1's clock)
+        const parts = bz.text.split(' \u00b7 ');
+        if (bz.warn || parts.length === 1){ const u = el('span', bz.warn ? '' : 'tzu'); u.textContent = parts[0]; a.tz.appendChild(u); }
+        else { const u = el('span', 'tzu'); u.textContent = parts[0]; const sp = el('span', 'tzs'); sp.textContent = ' \u00b7 '; const d = el('span'); d.textContent = parts[1]; a.tz.append(u, sp, d); }
+      }
+      a.tz.classList.toggle('warn', bz.warn);
+      a.tz.title = bz.warn ? 'No time zone on file for ' + id + '; its times use ' + (state.apts[0] || 'airport 1') + '\u2019s clock.' : '';
+    }
+    ui.planAir.textContent = c.planAir == null ? '\u2014' : c.planAir.toFixed(1) + ' h';
+    ui.planAirSub.textContent = c.planAir == null ? '' : '(' + fmtDur(c.planAirMin) + ')';
+    ui.planFuel.textContent = c.planFuel == null ? '\u2014' : c.planFuel.toFixed(1) + ' gal';
+    variance(ui.vars.tach, state.actTach, c.planAir);
+    variance(ui.vars.fuel, state.actFuel, c.planFuel);
+    labelAnchorSel();
+    save();
+  }
+
+  function say(text){
+    const m = $('msg');
+    m.textContent = text;
+    clearTimeout(say.t);
+    if (text) say.t = setTimeout(() => { m.textContent = ''; }, 6000);
+  }
+
+  // ---- saved days (named saves, kept in this browser) ----
+  const SAVES_KEY = 'dfs.saves.v1', MAX_SAVES = 100;
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  let currentName = '', armedDelete = null, armTimer = null;
+  const clone = o => JSON.parse(JSON.stringify(o));
+  function fmtDate(iso){
+    const d = new Date(iso);
+    return isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '-' + MONTHS[d.getMonth()] + '-' + d.getFullYear();
+  }
+  function readSaves(){
+    try {
+      const arr = JSON.parse(localStorage.getItem(SAVES_KEY) || '[]');
+      if (!Array.isArray(arr)) return [];
+      return arr.filter(x => x && typeof x.name === 'string' && x.state)
+                .map(x => ({ name: x.name.slice(0, 48), at: typeof x.at === 'string' ? x.at : '', state: sanitize(x.state) }));
+    } catch (e) { return []; }
+  }
+  function writeSaves(list){
+    try { localStorage.setItem(SAVES_KEY, JSON.stringify(list)); } catch (e) { return false; }
+    if (!writeSaves.quiet) sync.soon();
+    return true;
+  }
+  function upsertSave(name, st){
+    const list = readSaves(), key = name.toLowerCase();
+    const i = list.findIndex(x => x.name.toLowerCase() === key);
+    const entry = { name: name, at: new Date().toISOString(), state: clone(st) };
+    if (i >= 0) list[i] = entry; else list.push(entry);
+    list.sort((a, b) => (b.at > a.at ? 1 : (b.at < a.at ? -1 : 0)));
+    return { ok: writeSaves(list.slice(0, MAX_SAVES)), replaced: i >= 0 };
+  }
+  function setSaveMsg(text, undoFn){
+    const m = $('saveMsg');
+    m.textContent = text;
+    if (undoFn){
+      const b = el('button'); b.type = 'button'; b.textContent = 'Undo';
+      b.addEventListener('click', undoFn);
+      m.appendChild(b);
+    }
+    clearTimeout(setSaveMsg.t);
+    setSaveMsg.t = setTimeout(() => { m.textContent = ''; }, 12000);
+  }
+  function applyState(s){ state = sanitize(s); save(); build(); }
+  // Save-name default: once every airport of the day is entered, the name defaults to "KSBA KSDM MMSF ..."
+  const NAME_HINT = 'Name, e.g. Baja trip in March';
+  function routeName(){
+    const ids = state.apts.slice(0, state.legs + 1).map(a => String(a || '').trim().toUpperCase());
+    return ids.length && ids.every(Boolean) ? (ids.join(' ') + (okDate(state.date) ? ' ' + fmtDay(state.date).slice(4) : '')).slice(0, 48) : '';   // V6.1: airports + date
+  }
+  // V6.1: if the name field still holds the automatic name (airports + date) and those change, clear it,
+  // so Save makes a new entry under the new name instead of overwriting the old day; typed names are kept
+  let lastAuto = '';
+  function updateNameHint(){
+    const auto = routeName(), f = $('saveName');
+    if (lastAuto && f.value.trim() === lastAuto && auto !== lastAuto) f.value = '';
+    lastAuto = auto;
+    f.placeholder = auto || NAME_HINT;
+  }
+  document.addEventListener('input', e => { if (e.target && e.target.id !== 'saveName') updateNameHint(); });
+  document.addEventListener('change', () => updateNameHint());
+  $('legSeg').addEventListener('click', () => setTimeout(updateNameHint, 0));   // leg count changes which airports count
+  function renderSaves(){
+    updateNameHint();
+    const box = $('saveList');
+    box.innerHTML = '';
+    const list = readSaves();
+    if (!list.length){
+      const e = el('div', 'empty'); e.textContent = 'No saved days yet.';
+      box.appendChild(e);
+      return;
+    }
+    list.forEach(sv => {
+      const isCur = currentName && sv.name.toLowerCase() === currentName.toLowerCase();
+      const item = el('div', 'saveitem' + (isCur ? ' current' : ''));
+      const info = el('div', 'info');
+      const nm = el('div', 'nm'); nm.textContent = sv.name;
+      const meta = el('div', 'meta');
+      const route = sv.state.apts.slice(0, sv.state.legs + 1).filter(Boolean).join('-');
+      meta.textContent = [route, sv.state.legs + (sv.state.legs === 1 ? ' leg' : ' legs'), okDate(sv.state.date) ? 'flies ' + fmtDay(sv.state.date) : '', fmtDate(sv.at)].filter(Boolean).join(', ');
+      info.append(nm, meta);
+      const ld = el('button', 'btn'); ld.type = 'button'; ld.textContent = 'Load'; ld.setAttribute('aria-label', 'Load ' + sv.name);
+      ld.addEventListener('click', () => loadSave(sv.name));
+      const del = el('button', 'btn'); del.type = 'button'; del.setAttribute('aria-label', 'Delete ' + sv.name);
+      if (armedDelete === sv.name){ del.textContent = 'Tap again'; del.classList.add('danger'); } else del.textContent = 'Delete';
+      del.addEventListener('click', () => deleteSave(sv.name));
+      item.append(info, ld, del);
+      box.appendChild(item);
+    });
+    fitSaveList();
+  }
+  // show 3 saves, plus the top of the 4th so it's clear the list scrolls; keep the current save in view
+  function fitSaveList(){
+    const box = $('saveList'), items = box.querySelectorAll('.saveitem');
+    box.classList.remove('scroll'); box.style.maxHeight = '';
+    if (items.length <= 3) return;
+    const top = items[0].offsetTop;
+    const h = items[3].offsetTop - top + Math.round(items[3].offsetHeight * 0.4);
+    if (h > 0){ box.style.maxHeight = h + 'px'; box.classList.add('scroll'); }
+    const cur = box.querySelector('.saveitem.current');
+    if (cur) box.scrollTop = Math.max(0, cur.offsetTop - top - 4);
+  }
+  window.addEventListener('resize', () => { clearTimeout(fitSaveList.t); fitSaveList.t = setTimeout(fitSaveList, 150); });
+  function loadSave(name){
+    const e = readSaves().find(x => x.name === name);
+    if (!e) return;
+    const prev = clone(state), prevName = currentName;
+    applyState(e.state);
+    currentName = e.name; $('saveName').value = e.name;
+    renderSaves();
+    setSaveMsg('Loaded \u201c' + e.name + '\u201d.', () => {
+      applyState(prev); currentName = prevName; $('saveName').value = prevName;
+      renderSaves(); setSaveMsg('Undone.');
+    });
+  }
+  function deleteSave(name){
+    if (armedDelete !== name){
+      armedDelete = name;
+      clearTimeout(armTimer);
+      armTimer = setTimeout(() => { armedDelete = null; renderSaves(); }, 3000);
+      renderSaves();
+      return;
+    }
+    armedDelete = null; clearTimeout(armTimer);
+    sync.tombstone(name);
+    writeSaves(readSaves().filter(x => x.name !== name));
+    renderSaves();
+    setSaveMsg('Deleted \u201c' + name + '\u201d.');
+  }
+  function saveCurrent(){
+    const name = ($('saveName').value.trim() || routeName()).slice(0, 48);
+    if (!name){ setSaveMsg('Type a name first.'); $('saveName').focus(); return; }
+    $('saveName').value = name;
+    const r = upsertSave(name, state);
+    if (!r.ok){ setSaveMsg('Could not save: this browser is blocking storage or is out of space.'); return; }
+    currentName = name;
+    renderSaves();
+    setSaveMsg((r.replaced ? 'Updated \u201c' : 'Saved \u201c') + name + '\u201d.');
+  }
+  $('btnSave').addEventListener('click', saveCurrent);
+  $('saveName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveCurrent(); } });
+
+  // ---- sync (V4): one saved list shared by all your devices, keyed by a sync code ----
+  // The list lives on this app's own Netlify site (netlify/functions/sync). Each device keeps a full
+  // local copy and works offline; a sync sends this device's list + deletions, the server merges and
+  // returns the combined list. Same name = same schedule; the newer save wins; a delete wins over
+  // anything saved before it. Off netlify.app (or with ?demo=1) a stand-in server in this browser is used.
+  const sync = (() => {
+    const SKEY = 'dfs.sync.v1', DEMO_KEY = 'dfs.syncdemo.v1';
+    const ENDPOINT = '/.netlify/functions/sync';
+    const ALPH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I/L, so a code can be read aloud or retyped
+    const TOMB_DAYS = 120;
+    const demo = /(?:^\?|&)demo=1(?:&|$)/.test(location.search) || !/\.netlify\.app$/.test(location.hostname);
+    let cfg = readCfg(), busy = false, again = false, timer = null, errText = '';
+
+    function readCfg(){
+      try {
+        const c = JSON.parse(localStorage.getItem(SKEY) || 'null');
+        if (c && typeof c === 'object') return {
+          code: typeof c.code === 'string' ? c.code : '', last: typeof c.last === 'string' ? c.last : '',
+          tomb: (c.tomb && typeof c.tomb === 'object') ? c.tomb : {}, dirty: !!c.dirty };
+      } catch (e) {}
+      return { code: '', last: '', tomb: {}, dirty: false };
+    }
+    function writeCfg(){ try { localStorage.setItem(SKEY, JSON.stringify(cfg)); } catch (e) {} }
+    function newCode(){
+      let s = '';
+      while (s.length < 12){
+        const b = new Uint8Array(16); crypto.getRandomValues(b);
+        for (let i = 0; i < b.length && s.length < 12; i++) if (b[i] < 248) s += ALPH[b[i] % 31];   // 248 = 8*31: no bias
+      }
+      return fmtCode(s);
+    }
+    function fmtCode(s){ return s.slice(0, 4) + '-' + s.slice(4, 8) + '-' + s.slice(8, 12); }
+    function normCode(input){
+      const s = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (s.length !== 12) return '';
+      for (const ch of s) if (ALPH.indexOf(ch) < 0) return '';
+      return fmtCode(s);
+    }
+    // Same merge as the server's (netlify/functions/sync.mjs); keep the two identical.
+    function merge(a, b){
+      const items = new Map(), tomb = {};
+      const cutoff = new Date(Date.now() - TOMB_DAYS * 864e5).toISOString();
+      [a, b].forEach(d => {
+        if (!d) return;
+        (Array.isArray(d.items) ? d.items : []).forEach(x => {
+          if (!x || typeof x.name !== 'string' || !x.state) return;
+          const k = x.name.toLowerCase(), cur = items.get(k);
+          if (!cur || String(x.at || '') > String(cur.at || '')) items.set(k, x);
+        });
+        const t = (d.tomb && typeof d.tomb === 'object') ? d.tomb : {};
+        Object.keys(t).forEach(k => { const v = String(t[k]); if (!tomb[k] || v > tomb[k]) tomb[k] = v; });
+      });
+      const out = [];
+      items.forEach((x, k) => {
+        if (tomb[k] && tomb[k] >= String(x.at || '')) return;   // deleted after its last save
+        delete tomb[k];
+        out.push(x);
+      });
+      Object.keys(tomb).forEach(k => { if (tomb[k] < cutoff) delete tomb[k]; });
+      out.sort((p, q) => (String(q.at) > String(p.at) ? 1 : (String(q.at) < String(p.at) ? -1 : 0)));
+      return { items: out.slice(0, MAX_SAVES), tomb: tomb };
+    }
+
+    // ---- server (real, or the demo stand-in) ----
+    function demoRead(){ try { return JSON.parse(localStorage.getItem(DEMO_KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function demoWrite(all){ try { localStorage.setItem(DEMO_KEY, JSON.stringify(all)); } catch (e) {} }
+    async function call(code, doc, mustExist){
+      if (demo){
+        await new Promise(r => setTimeout(r, 400));
+        const all = demoRead();
+        if (mustExist && !all[code]){ const e = new Error('not found'); e.status = 404; throw e; }
+        const merged = merge(all[code], doc);
+        all[code] = merged; demoWrite(all);
+        return merged;
+      }
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await fetch(ENDPOINT, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal, cache: 'no-store',
+          body: JSON.stringify({ code: code, join: !!mustExist, items: doc.items, tomb: doc.tomb })
+        });
+        if (!r.ok){ const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+        return await r.json();
+      } finally { clearTimeout(to); }
+    }
+
+    // ---- one sync pass ----
+    async function run(mustExist){
+      if (!cfg.code) return true;
+      if (busy){ again = true; return true; }
+      busy = true; errText = ''; show();
+      let ok = true;
+      try {
+        const local = { items: readSaves(), tomb: cfg.tomb };
+        const res = await call(cfg.code, local, mustExist);
+        const merged = merge(local, res);
+        writeSaves.quiet = true; writeSaves(merged.items); writeSaves.quiet = false;
+        cfg.tomb = merged.tomb; cfg.last = new Date().toISOString(); cfg.dirty = false;
+        renderSaves();
+      } catch (e) {
+        ok = false;
+        if (mustExist && e.status === 404){ busy = false; throw e; }
+        cfg.dirty = true;
+        errText = e.name === 'AbortError' ? 'timed out' : (e.status ? 'server said ' + e.status : (navigator.onLine === false ? 'offline' : 'no connection'));
+      }
+      writeCfg();
+      busy = false; show();
+      if (again){ again = false; run(); }
+      return ok;
+    }
+    function soon(){ if (!cfg.code) return; cfg.dirty = true; writeCfg(); clearTimeout(timer); timer = setTimeout(() => run(), 700); }
+    function tombstone(name){ cfg.tomb[String(name).toLowerCase()] = new Date().toISOString(); writeCfg(); }
+
+    // ---- status line + buttons ----
+    function fmtWhen(iso){
+      const d = new Date(iso); if (isNaN(d)) return '';
+      const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      return d.toDateString() === new Date().toDateString() ? hm : fmtDate(iso) + ' ' + hm;
+    }
+    function show(){
+      const on = !!cfg.code, dot = $('syncDot'), st = $('syncStatus');
+      dot.className = 'syncdot' + (!on ? '' : busy ? ' busy' : errText ? ' err' : ' on');
+      st.textContent = '';
+      if (!on){
+        st.textContent = 'Sync is off. Saves stay on this device.';
+      } else {
+        const c = el('span', 'mono'); c.textContent = cfg.code;
+        st.append('Sync on, code ', c, '. ');
+        st.append(busy ? 'Syncing…'
+          : errText ? 'Couldn’t reach the sync server (' + errText + '). Your saves are safe here and will sync next time.'
+          : cfg.last ? 'Last synced ' + fmtWhen(cfg.last) + '.' : '');
+      }
+      $('syncOffBtns').hidden = on;
+      $('syncOnBtns').hidden = !on;
+      if (on) $('syncJoinRow').hidden = true;
+      $('btnSyncNow').disabled = busy;
+      $('syncHint').textContent = on
+        ? 'Every save, update and delete goes to all devices using this code. If two devices change the same schedule, the newer save wins. Anyone with the code can see these saves.'
+        : 'Turning on sync gives you a code. Enter it once on each of your other devices, and they all keep one list. Anyone with the code can see these saves, so treat it like a password.';
+      $('saveHint').textContent = on
+        ? 'Save this schedule under a name and load it later, on any of your synced devices.'
+        : 'Save this schedule under a name and load it later. Turn on sync to keep the same list on all your devices.';
+      $('syncDemo').hidden = !demo;
+    }
+
+    async function turnOn(){
+      cfg = { code: newCode(), last: '', tomb: {}, dirty: true }; writeCfg();
+      const ok = await run();
+      setSaveMsg(ok ? 'Sync is on. Your code is ' + cfg.code + '. Enter it on your other devices (Copy code puts it on the clipboard).'
+                    : 'Sync is on with code ' + cfg.code + ', but the server couldn’t be reached yet. It will retry.');
+    }
+    async function join(){
+      const code = normCode($('syncCodeIn').value);
+      if (!code){ setSaveMsg('A sync code is 12 letters and digits, like K7QM-4XRT-9PWD.'); $('syncCodeIn').focus(); return; }
+      const before = readSaves().length;
+      cfg = { code: code, last: '', tomb: {}, dirty: true }; writeCfg();
+      try {
+        const ok = await run(true);
+        $('syncCodeIn').value = '';
+        if (!ok){ setSaveMsg('Code saved, but the server couldn’t be reached yet. It will retry.'); return; }
+        setSaveMsg('Joined. ' + (before ? 'This device’s ' + before + (before === 1 ? ' save was' : ' saves were') + ' added to the shared list.' : 'The shared list is now on this device.'));
+      } catch (e) {
+        cfg = { code: '', last: '', tomb: {}, dirty: false }; writeCfg(); show();
+        setSaveMsg('No synced list was found for ' + code + '. Check the code and try again.');
+      }
+    }
+    function turnOff(){
+      cfg = { code: '', last: '', tomb: {}, dirty: false }; writeCfg(); errText = ''; show();
+      setSaveMsg('Sync is off on this device. Your saves stay here; other devices keep syncing.');
+    }
+    async function copyCode(){
+      try { await navigator.clipboard.writeText(cfg.code); setSaveMsg('Code copied: ' + cfg.code); }
+      catch (e) { setSaveMsg('Your sync code is ' + cfg.code); }
+    }
+    async function demoOther(){
+      if (!cfg.code){ setSaveMsg('Turn on sync first, then try this.'); return; }
+      const all = demoRead(), now = new Date().toISOString();
+      const name = 'From iPad ' + fmtWhen(now);
+      all[cfg.code] = merge(all[cfg.code], { items: [{ name: name, at: now, state: clone(exampleState()) }], tomb: {} });
+      demoWrite(all);
+      await run();
+      setSaveMsg('The pretend iPad saved “' + name + '”; this device picked it up on the next sync.');
+    }
+
+    $('btnSyncOn').addEventListener('click', turnOn);
+    $('btnSyncHave').addEventListener('click', () => { $('syncJoinRow').hidden = false; $('syncCodeIn').focus(); });
+    $('btnSyncJoin').addEventListener('click', join);
+    $('syncCodeIn').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); join(); } });
+    $('btnSyncNow').addEventListener('click', () => run());
+    $('btnSyncCopy').addEventListener('click', copyCode);
+    $('btnSyncOff').addEventListener('click', turnOff);
+    $('btnDemoOther').addEventListener('click', demoOther);
+    // catch up when the app comes back to the front or the network returns
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && cfg.code && (cfg.dirty || Date.now() - new Date(cfg.last || 0) > 30000)) run();
+    });
+    window.addEventListener('online', () => { if (cfg.code && cfg.dirty) run(); });
+    // while the app is on screen, check for other devices' changes every 2 minutes (paused in the background)
+    // (checked every 15 s, so a pull happens 2:00-2:15 after the last sync, whatever caused that sync)
+    const POLL_MS = 120000;
+    setInterval(() => {
+      if (cfg.code && !busy && document.visibilityState === 'visible' && Date.now() - new Date(cfg.last || 0) >= POLL_MS) run();
+    }, 15000);
+
+    return { soon: soon, tombstone: tombstone, run: run, show: show };
+  })();
+
+  // ---- schedule link: the whole schedule travels in the address after "?s=" ----
+  function showNotice(text){ $('noticeText').textContent = text; $('notice').hidden = false; }
+  $('noticeClose').addEventListener('click', () => { $('notice').hidden = true; });
+  const APP_LINK_BASE = 'https://days-flight-schedule.netlify.app/';   // canonical live URL (App-Conventions §1)
+  // Reads a schedule from "?s=" (current) or "#d=" (older links). Resolves true if it replaced the screen.
+  // ---- plain fill-in link (V5): what Claude sends back after running the legs through ForeFlight ----
+  //   ?apts=KSBA,KSDM,MMSF,MMLT&ete=1:47,1:22,2:41&gal=11.3,9.1,17.6[&route=DCT|DCT|V27][&wu=08:00 | &home=07:00]
+  // Fills in airports, ETE and fuel (and routes) on the CURRENT screen; turnarounds, notes and the planned-around
+  // time stay unless the link changes them. Notes for a stop whose airport changed are cleared.
+  function parsePlainLink(search){
+    let sp; try { sp = new URLSearchParams(search || ''); } catch (e) { return null; }
+    if (!sp.has('apts')) return null;
+    const list = k => (sp.get(k) || '').split(',').map(x => x.trim()).filter((x, i, a) => !(a.length === 1 && x === ''));
+    const apts = list('apts').map(a => a.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    const N = apts.length - 1;
+    if (N < 1 || N > MAXLEGS || !apts.every(a => a.length >= 2 && a.length <= 4)) return { error: 'airports' };
+    const ete = list('ete');
+    if (ete.length !== N || !ete.every(e => /^\d{1,2}:[0-5]\d$/.test(e))) return { error: 'ETE' };
+    const gal = sp.has('gal') ? list('gal') : [];
+    if (gal.length && (gal.length !== N || !gal.every(g => /^\d{1,3}(\.\d)?$/.test(g)))) return { error: 'fuel' };
+    const route = sp.has('route') ? (sp.get('route') || '').split('|').map(r => r.trim().slice(0, 200)) : [];
+    if (route.length && route.length !== N) return { error: 'route' };
+    const turn = sp.has('turn') ? list('turn') : [];
+    if (turn.length && (turn.length !== N - 1 || !turn.every(t => /^\d{1,2}:[0-5]\d$/.test(t)))) return { error: 'turnaround' };
+    let time = null, anchor = null;
+    if (sp.has('wu')){ time = sp.get('wu'); anchor = 'wu1'; }
+    else if (sp.has('home')){ time = sp.get('home'); anchor = 'home'; }
+    if (time != null && parseClock(time) == null) return { error: 'time' };
+    if (time != null) time = String(parseClock(time) / 60 | 0).padStart(2, '0') + ':' + String(parseClock(time) % 60).padStart(2, '0');
+    const date = sp.has('date') ? sp.get('date') : null;
+    if (date != null && !okDate(date)) return { error: 'date' };
+    return { apts: apts, ete: ete, gal: gal, route: route, turn: turn, time: time, anchor: anchor, date: date };
+  }
+  // A fill-in link starts a NEW day: app defaults (turnarounds 0:45, pattern 0:05, ...) plus what the link carries.
+  function lastWheelsUp(){   // Wheels Up 1 on the screen now, as 24-hour HH:MM (the "last used" wheels-up time)
+    const m = compute(state).wheels[1];
+    if (m == null) return '08:00';
+    const d = ((m % 1440) + 1440) % 1440;
+    return String(Math.floor(d / 60)).padStart(2, '0') + ':' + String(d % 60).padStart(2, '0');
+  }
+  function newDayFromPlain(p){
+    const s = blankState(), N = p.apts.length - 1;
+    s.legs = N;
+    p.apts.forEach((a, k) => { s.apts[k] = a; });
+    for (let i = 1; i <= N; i++){
+      s.ete[i] = p.ete[i - 1];
+      if (p.gal.length) s.gal[i] = p.gal[i - 1];
+      if (p.route.length) s.route[i] = p.route[i - 1];
+      if (i < N && p.turn.length) s.turn[i] = p.turn[i - 1];
+    }
+    s.date = p.date || (okDate(state.date) ? state.date : tomorrowIso());   // no date in the link: keep the screen's
+    if (p.time){ s.wheels = p.time; s.anchor = p.anchor; }
+    else { s.wheels = lastWheelsUp(); s.anchor = 'wu1'; }   // no time in the link: keep the last wheels-up used
+    return sanitize(s);
+  }
+  async function applyLinkFromUrl(search, hash){
+    const own = search === undefined;   // reading this window's own address (not a hand-off from another tab)
+    if (own){ search = location.search || ''; hash = location.hash || ''; }
+    const clearUrl = () => { if (own){ try { history.replaceState(null, '', location.pathname); } catch (e) {} } };
+    const plain = parsePlainLink(search);
+    if (plain){
+      clearUrl();
+      if (plain.error){ showNotice('That fill-in link has a problem with its ' + plain.error + ', so your schedule was not changed.'); return false; }
+      const wuKept = lastWheelsUp();
+      const merged = newDayFromPlain(plain);
+      let extra = '';
+      if (hadCache && JSON.stringify(sanitize(state)) !== JSON.stringify(merged) && upsertSave('Before opening link', state).ok){
+        extra = ' Your previous screen is saved as \u201cBefore opening link\u201d.';
+      }
+      state = merged; save(); currentName = ''; hadCache = true;
+      const n = plain.apts.length - 1;
+      showNotice('New day from ForeFlight: ' + plain.apts.join(' ') + ' on ' + fmtDay(merged.date) + ', ' + n + (n === 1 ? ' leg' : ' legs') + ' with ETE' + (plain.gal.length ? ' and fuel' : '') + ' filled in' + (plain.time ? '' : ' (no wheels-up time in the link, so your last one, ' + wuKept + ', was kept)') + '. ' + (plain.turn.length ? 'Turnarounds are from the link; other times' : 'Turnarounds and other times') + ' are the app defaults; check them, then Save.' + extra);
+      return true;
+    }
+    const q = /(?:^\?|&)s=([A-Za-z0-9_-]+)(?:&|$)/.exec(search || '');
+    const h = /^#d=([A-Za-z0-9_-]+)$/.exec(hash || '');
+    if (!q && !h) return false;
+    clearUrl();   // so a reload keeps your edits
+    let linked = null;
+    if (q && q[1].length <= 6000) linked = await decodeLinkPayload(q[1]);
+    else if (h && h[1].length <= 6000) linked = decodeState(h[1]);
+    if (!linked){ showNotice('That link could not be read, so your schedule was not changed.'); return false; }
+    let extra = '';
+    if (hadCache && JSON.stringify(sanitize(state)) !== JSON.stringify(linked) && upsertSave('Before opening link', state).ok){
+      extra = ' Your previous screen is saved as \u201cBefore opening link\u201d.';
+    }
+    state = linked; save(); currentName = ''; hadCache = true;
+    showNotice('Loaded the schedule from a link.' + extra);
+    return true;
+  }
+  async function copyLink(){
+    const url = APP_LINK_BASE + '?s=' + await encodeState(state);
+    try {
+      await navigator.clipboard.writeText(url);
+      say('Link copied. Paste it into Notes, Messages or Mail to reopen this schedule on any device.');
+      return;
+    } catch (e) {}
+    if (navigator.share){ try { await navigator.share({ title: "Day's Flight Schedule", url: url }); } catch (e) {} return; }
+    window.prompt('Copy this link:', url);
+  }
+  $('btnLink').addEventListener('click', copyLink);
+
+  // ---- "Get ETE & fuel from ForeFlight (via Claude)": opens Claude with the request already typed ----
+  const CLAUDE_NEW = 'https://claude.ai/new?q=';   // prefilled-prompt link (third-party documented; see App Conventions §7)
+  const CLAUDE_HOWTO = APP_LINK_BASE + 'claude.md';
+  function claudeRequest(){
+    return [
+      'Please use my ForeFlight Mobile connector to plan a new day in my Day\'s Flight Schedule app.',
+      'Instructions and the link format to send back: ' + CLAUDE_HOWTO,
+      'Ask me for my airports in order on one line (e.g. KSBA KSDM MMSF MMLT = 3 legs), aircraft, performance profile and altitude.',
+      'Date: ' + fmtDay(state.date) + ' (' + state.date + ') unless I give another date.',
+      'Wheels Up 1: ' + lastWheelsUp() + ' (24-hour, local at the first airport) unless I give another time.'
+    ].join('\n');
+  }
+  $('btnClaudeFF').addEventListener('click', () => {
+    // a separate window beside this one on desktop browsers; phones and tablets open a tab instead (they have no separate windows)
+    const W = Math.min(560, screen.availWidth || 560), H = Math.min(900, (screen.availHeight || 900) - 40);
+    let L = (window.screenX || 0) + (window.outerWidth || 0) + 8;
+    if (L + W > (screen.availLeft || 0) + (screen.availWidth || W)) L = Math.max(screen.availLeft || 0, (screen.availLeft || 0) + (screen.availWidth || W) - W);
+    const T = Math.max(screen.availTop || 0, window.screenY || 0);
+    const w = window.open(CLAUDE_NEW + encodeURIComponent(claudeRequest()), 'claude-foreflight',
+      'popup=yes,width=' + W + ',height=' + H + ',left=' + L + ',top=' + T);
+    if (!w) showNotice('Your browser blocked the new window. Allow pop-ups for this site, then tap the button again.');
+  });
+  window.addEventListener('hashchange', async () => { if (await applyLinkFromUrl()){ build(); renderSaves(); } });
+
+  // ---- hand-off (V5): a schedule link opened in a NEW tab is passed to a Day's Flight Schedule window that is already
+  // open in this browser (BroadcastChannel, same site), so the day shows up where the pilot started. If no other window
+  // answers within half a second, or the browser lacks BroadcastChannel, the link opens in this tab as before.
+  const HANDOFF = ('BroadcastChannel' in window) ? new BroadcastChannel('dfs-handoff-v1') : null;
+  const myId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  let sentAway = false;
+  if (HANDOFF) HANDOFF.addEventListener('message', async e => {
+    const m = e.data || {};
+    if (m.type === 'ping' && m.from !== myId && !sentAway && document.visibilityState !== 'prerender'){
+      HANDOFF.postMessage({ type: 'pong', from: myId, to: m.from });
+    } else if (m.type === 'apply' && m.to === myId){
+      const changed = await applyLinkFromUrl(String(m.search || ''), String(m.hash || ''));
+      if (changed){ build(); renderSaves(); }
+      HANDOFF.postMessage({ type: 'applied', from: myId, to: m.from });
+      try { window.scrollTo(0, 0); window.focus(); } catch (err) {}
+    }
+  });
+  function handOff(search, hash){
+    return new Promise(resolve => {
+      if (!HANDOFF) return resolve(false);
+      let target = null, done = false;
+      const finish = v => { if (done) return; done = true; HANDOFF.removeEventListener('message', on); resolve(v); };
+      const on = e => {
+        const m = e.data || {};
+        if (m.to !== myId) return;
+        if (m.type === 'pong' && !target){
+          target = m.from;
+          HANDOFF.postMessage({ type: 'apply', from: myId, to: target, search: search, hash: hash });
+          setTimeout(() => finish(false), 2000);
+        } else if (m.type === 'applied' && m.from === target) finish(true);
+      };
+      HANDOFF.addEventListener('message', on);
+      HANDOFF.postMessage({ type: 'ping', from: myId });
+      setTimeout(() => { if (!target) finish(false); }, 500);
+    });
+  }
+  function showSentCover(search, hash){
+    sentAway = true;
+    const cv = el('div', 'sentcover');
+    const box = el('div', 'sentbox');
+    const h = el('h2'); h.textContent = 'Sent to your open schedule';
+    const t = el('p'); t.textContent = 'The new day was opened in the Day\u2019s Flight Schedule window you already had open. You can close this tab.';
+    const again = el('button', 'btn'); again.type = 'button'; again.textContent = 'Open it here instead';
+    again.addEventListener('click', () => { location.href = location.pathname + (search ? search + '&here=1' : '?here=1') + (hash || ''); });
+    box.append(h, t, again); cv.appendChild(box); document.body.appendChild(cv);
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    try { window.close(); } catch (e) {}   // only works for windows a script opened; otherwise the message stays
+  }
+
+  // iPhone/iPad: window.print() is unreliable (nothing happens in some contexts, e.g. a Home Screen app),
+  // so build a PDF and hand it to the share sheet (Print, Save to Files, Mail...). Everything else prints.
+  //
+  // navigator.share() only works when called synchronously inside the click handler that triggered it
+  // (iOS revokes the "user gesture" if anything async runs first) — so jsPDF has to already be loaded
+  // by the time the button is tapped. The button stays disabled on iOS until that library is ready,
+  // rather than racing it inside the click handler. Every outcome — success, a slow load, a load that
+  // never finishes, a share failure — is reported in #msg, so a silent "nothing happened" can't occur.
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.indexOf('Macintosh') > -1 && navigator.maxTouchPoints > 1);
+  const btnPrint = $('btnPrint');
+  let jspdfOk = !!(window.jspdf && window.jspdf.jsPDF);
+  let jspdfGaveUp = false;
+  function jsPdfCtor(){ return window.jspdf && window.jspdf.jsPDF; }
+  if (isIOS && !jspdfOk){
+    btnPrint.disabled = true;
+    btnPrint.textContent = 'Preparing\u2026';
+    let triedFallbackCdn = false;
+    let tries = 0;
+    (function pollJspdf(){
+      if (jsPdfCtor()){
+        jspdfOk = true;
+        btnPrint.disabled = false;
+        btnPrint.textContent = 'Print / PDF';
+        return;
+      }
+      // ~5s with no luck from the first CDN: try a second one, in case the first is blocked for this network.
+      if (tries === 20 && !triedFallbackCdn){
+        triedFallbackCdn = true;
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+        document.head.appendChild(s);
+      }
+      if (++tries > 60){   // ~15s total: give up waiting
+        jspdfGaveUp = true;
+        btnPrint.disabled = false;
+        btnPrint.textContent = 'Print / PDF';
+        say('The PDF tool did not finish loading (check your connection). Tapping Print / PDF will try the browser\u2019s print dialog instead, which may not do anything on iPhone or iPad \u2014 reloading the page and trying again usually fixes this.');
+        return;
+      }
+      setTimeout(pollJspdf, 250);
+    })();
+  }
+  function openPdf(blob){
+    // A blob: URL opened in a *new* tab often comes up blank on iOS Safari (the new tab doesn't share
+    // the memory that holds the blob). Navigating the current tab is the reliable path: Safari's own
+    // PDF viewer opens in-place, with its own Share/Print icon.
+    say('Opening the PDF\u2026');
+    const url = URL.createObjectURL(blob);
+    location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  function printOrPdf(){
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (isIOS && jspdfOk && jsPdfCtor()){
+      try {
+        const name = pdfFileName(state);
+        const blob = buildPdf(jsPdfCtor(), state).output('blob');
+        const file = (typeof File === 'function') ? new File([blob], name, { type: 'application/pdf' }) : null;
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })){
+          say('Opening the share sheet\u2026');
+          navigator.share({ files: [file], title: "Day's Flight Schedule" }).then(() => say('')).catch(err => {
+            if (!err || err.name !== 'AbortError') openPdf(blob); else say('');
+          });
+        } else {
+          openPdf(blob);
+        }
+        return;
+      } catch (e) {
+        say('Could not build the PDF (' + ((e && e.message) || 'unknown error') + '). Opening the print dialog instead.');
+      }
+    } else if (isIOS && jspdfGaveUp){
+      say('The PDF tool never loaded, so this uses the browser\u2019s print dialog instead, which may not do anything on iPhone or iPad.');
+    } else if (isIOS){
+      say('Still preparing the PDF tool \u2014 try again in a moment.');
+      return;
+    }
+    window.print();
+  }
+  btnPrint.addEventListener('click', printOrPdf);
+  let titleBeforePrint = document.title;
+  window.addEventListener('beforeprint', () => {
+    titleBeforePrint = document.title;
+    const ids = state.apts.slice(0, state.legs + 1).filter(Boolean);
+    document.title = 'Flight Schedule' + (ids.length ? ' ' + ids.join('-') : '');
+  });
+  window.addEventListener('afterprint', () => { document.title = titleBeforePrint; });
+  $('btnExample').addEventListener('click', () => { state = exampleState(); currentName = ''; save(); build(); renderSaves(); say('Example day loaded.'); });
+  $('btnClear').addEventListener('click', () => { const n = state.legs; state = blankState(); state.legs = n; currentName = ''; save(); build(); renderSaves(); say('Cleared.'); });
+
+  // ---- share button (App-Conventions §6a) ----
+  (() => {
+    const APP_URL   = 'https://days-flight-schedule.netlify.app/';   // canonical live URL from §1
+    const APP_TITLE = "Day's Flight Schedule";
+    const APP_TEXT  = 'Plan a multi-leg flying day: every clock time, fuel and airtime in one place.';
+    const btn = document.getElementById('shareBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const label = btn.querySelector('span') || btn;
+      const original = label.textContent;
+      if (navigator.share){
+        try { await navigator.share({ title: APP_TITLE, text: APP_TEXT, url: APP_URL }); return; }
+        catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+      }
+      try {
+        await navigator.clipboard.writeText(APP_URL);
+        label.textContent = 'Link copied to clipboard!';
+        setTimeout(() => { label.textContent = original; }, 2200);
+      } catch (err) {
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(APP_TITLE)
+          + '&body=' + encodeURIComponent(APP_TEXT + ' ' + APP_URL);
+      }
+    });
+  })();
+
+  // ---- open counter (App-Conventions §6b; Tally, fails silently) ----
+  fetch('https://tally.yuki.sh/hits/wamware/days-flight-schedule.json')
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('hitCounter');
+      const n = d && d.visit;
+      if (el && typeof n === 'number') el.textContent = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+    })
+    .catch(() => { /* counter is a nice-to-have, never block the app */ });
+
+  build();
+  renderSaves();
+  sync.show(); sync.run();
+  // airport time zones (V6): same-site file; until it loads (or if it can't) the day runs on one clock, as before V6
+  fetch('airport-tz.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => { setTzTable(d); recompute(); })
+    .catch(e => { console.warn('airport-tz.json not loaded; times use one clock', e); });
+  (async () => {
+    const search = location.search || '', hash = location.hash || '';
+    const hasLink = !!parsePlainLink(search) || /(?:^\?|&)s=/.test(search) || /^#d=/.test(hash);
+    if (hasLink && !/(?:^\?|&)here=1(?:&|$)/.test(search) && await handOff(search, hash)){ showSentCover(search, hash); return; }
+    if (await applyLinkFromUrl()){ build(); renderSaves(); }
+  })();
+})();
+
+// ---- Install (V5): copied from the Control Panel (App Conventions §8), names kept local ----
+(() => {
+  const installBtn = document.getElementById('installBtn');
+  const installOverlay = document.getElementById('installOverlay');
+  const installText = document.getElementById('installText');
+  const installClose = document.getElementById('installClose');
+  if (!installBtn) return;
+  let deferredPrompt = null;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const ua = navigator.userAgent;
+  const onIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+  const onMac = /Macintosh/.test(ua) && !onIOS;
+  const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
+  function showInstallOverlay(message){ installText.textContent = message; installOverlay.classList.add('open'); }
+  if (!isStandalone) installBtn.style.display = 'inline-flex';
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; });
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; return; }
+    if (onIOS) showInstallOverlay('On your iPhone or iPad: tap the Share icon in Safari\u2019s toolbar, then choose \u201cAdd to Home Screen.\u201d');
+    else if (onMac && isSafari) showInstallOverlay('On your Mac: in Safari\u2019s menu bar, choose File \u2192 Add to Dock. (Safari 17 or later required.)');
+    else showInstallOverlay('Look for an install icon in your browser\u2019s address bar, or check your browser\u2019s menu for \u201cInstall App\u201d or \u201cAdd to Home Screen.\u201d');
+  });
+  installClose.addEventListener('click', () => installOverlay.classList.remove('open'));
+  installOverlay.addEventListener('click', (e) => { if (e.target === installOverlay) installOverlay.classList.remove('open'); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
