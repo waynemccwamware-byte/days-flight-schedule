@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Day's Flight Schedule V6.2 (19-Oct-2026): box-1 buttons moved to the title row. V6 (15-Oct-2026): flight date + per-airport local times (airport-tz.json); based on V5 -->
+<!-- Day's Flight Schedule V6.4 (10-Nov-2026): second ForeFlight button brings in the day's saved Flights; fuel = trip burn + taxi. V6.2 (19-Oct-2026): box-1 buttons moved to the title row. V6 (15-Oct-2026): flight date + per-airport local times (airport-tz.json); based on V5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -321,10 +321,11 @@
 
   /* ForeFlight via Claude (V5) */
   .ffbox{ margin-top:8px; padding-top:8px; border-top:1px solid var(--bezel); display:flex; align-items:center; gap:10px; }
-  .ffbox .btn{ flex:0 0 auto; max-width:36%; border-color:var(--teal); color:var(--teal); padding:6px 8px; font-size:12px; line-height:1.25; }
+  .ffbtns{ flex:0 0 auto; max-width:36%; display:flex; flex-direction:column; gap:6px; }   /* V6.4: two ForeFlight buttons stacked */
+  .ffbox .btn{ border-color:var(--teal); color:var(--teal); padding:6px 8px; font-size:12px; line-height:1.25; }
   .ffbox .btn:hover{ color:var(--amber); border-color:var(--amber); }
   .step-body p.hint.ffhint{ flex:1 1 0; min-width:0; margin:0; font-size:10px; line-height:1.3; }
-  @media (min-width:601px){ .ffbox .btn{ max-width:none; } }
+  @media (min-width:601px){ .ffbtns{ max-width:none; } }
 
   /* sync (V4) */
   .syncbox{ margin-top:6px; padding-top:10px; border-top:1px solid var(--bezel); }
@@ -459,7 +460,7 @@
 
   <div class="title-row">
     <h1>Day's Flight Schedule</h1>
-    <span class="ver mono">v6.3</span>
+    <span class="ver mono">v6.4</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
 
@@ -491,8 +492,11 @@
         </div>
         <p class="hint">The time you plan around is the one you type in (marked <span class="tag" style="margin:0">start here</span>); every other time works out from it. Switching doesn't move the schedule.</p>
         <div class="ffbox">
-          <button class="btn" id="btnClaudeFF" type="button">Get ETE &amp; fuel from ForeFlight (via Claude)</button>
-          <p class="hint ffhint">Opens Claude in a new window; give it your airports and times. Claude runs each leg through ForeFlight and sends back a link; tap it to open the new day here with ETE and fuel filled in. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
+          <div class="ffbtns">
+            <button class="btn" id="btnClaudeFF" type="button">Get ETE/fuel from ForeFlight FPL (Maps tab)</button>
+            <button class="btn" id="btnClaudeFlights" type="button">Get full info from ForeFlight Flights tab</button>
+          </div>
+          <p class="hint ffhint">Each opens Claude in a new window. Top: give Claude your airports and it runs each leg through ForeFlight. Bottom: Claude brings in the Flights saved in ForeFlight for this date (ETD, ETE, fuel, route). Tap the link Claude sends back to open the new day here. Fuel is trip burn plus taxi. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
         </div>
       </div>
     </section>
@@ -1880,7 +1884,7 @@ function stateFromArr(arr){
   }
   $('btnLink').addEventListener('click', copyLink);
 
-  // ---- "Get ETE & fuel from ForeFlight (via Claude)": opens Claude with the request already typed ----
+  // ---- "Get ETE/fuel from ForeFlight FPL (Maps tab)": opens Claude with the request already typed ----
   const CLAUDE_NEW = 'https://claude.ai/new?q=';   // prefilled-prompt link (third-party documented; see App Conventions §7)
   const CLAUDE_HOWTO = APP_LINK_BASE + 'claude.md';
   function claudeRequest(){
@@ -1892,16 +1896,25 @@ function stateFromArr(arr){
       'Wheels Up 1: ' + lastWheelsUp() + ' (24-hour, local at the first airport) unless I give another time.'
     ].join('\n');
   }
-  $('btnClaudeFF').addEventListener('click', () => {
+  // ---- "Get full info from ForeFlight Flights tab" (V6.4): Claude brings in the saved Flights for the app's date ----
+  function claudeRequestFlights(){
+    return [
+      'Please use my ForeFlight Mobile connector to bring the Flights I saved in ForeFlight for ' + fmtDay(state.date) + ' (' + state.date + ') into my Day\'s Flight Schedule app.',
+      'Instructions and the link format to send back: ' + CLAUDE_HOWTO + ' (follow section 5, Flights tab).'
+    ].join('\n');
+  }
+  function openClaude(text){
     // a separate window beside this one on desktop browsers; phones and tablets open a tab instead (they have no separate windows)
     const W = Math.min(560, screen.availWidth || 560), H = Math.min(900, (screen.availHeight || 900) - 40);
     let L = (window.screenX || 0) + (window.outerWidth || 0) + 8;
     if (L + W > (screen.availLeft || 0) + (screen.availWidth || W)) L = Math.max(screen.availLeft || 0, (screen.availLeft || 0) + (screen.availWidth || W) - W);
     const T = Math.max(screen.availTop || 0, window.screenY || 0);
-    const w = window.open(CLAUDE_NEW + encodeURIComponent(claudeRequest()), 'claude-foreflight',
+    const w = window.open(CLAUDE_NEW + encodeURIComponent(text), 'claude-foreflight',
       'popup=yes,width=' + W + ',height=' + H + ',left=' + L + ',top=' + T);
     if (!w) showNotice('Your browser blocked the new window. Allow pop-ups for this site, then tap the button again.');
-  });
+  }
+  $('btnClaudeFF').addEventListener('click', () => openClaude(claudeRequest()));
+  $('btnClaudeFlights').addEventListener('click', () => openClaude(claudeRequestFlights()));
   window.addEventListener('hashchange', async () => { if (await applyLinkFromUrl()){ build(); renderSaves(); } });
 
   // ---- hand-off (V5): a schedule link opened in a NEW tab is passed to a Day's Flight Schedule window that is already
