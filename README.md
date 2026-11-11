@@ -4,7 +4,7 @@ GeezerGeek Pilot app — plan a flying day from wheels up at home to wheels down
 Live: https://days-flight-schedule.netlify.app/
 
 - `site/` — what Netlify publishes (index.html, claude.md, airport-tz.json, manifest.json, sw.js, icons/)
-- `netlify/functions/sync.js` — cross-device sync of saved schedules (Netlify Blobs store `days-flight-schedule-sync`; dependency-free)
+- `netlify/functions/sync.mjs` — cross-device sync (current function format; strongly consistent reads) of saved schedules (Netlify Blobs store `days-flight-schedule-sync`; dependency-free)
 - `netlify.toml` — publish dir and functions dir; no build step
 
 Every push to `main` redeploys the site.
