@@ -493,7 +493,7 @@
         <p class="hint">The time you plan around is the one you type in (marked <span class="tag" style="margin:0">start here</span>); every other time works out from it. Switching doesn't move the schedule.</p>
         <div class="ffbox">
           <div class="ffbtns">
-            <button class="btn" id="btnClaudeFF" type="button">Get ETE/fuel from ForeFlight FPL (Maps tab)</button>
+            <button class="btn" id="btnClaudeFF" type="button">Get draft ETE/fuel from ForeFlight Maps tab</button>
             <button class="btn" id="btnClaudeFlights" type="button">Get full info from ForeFlight Flights tab</button>
           </div>
           <p class="hint ffhint">Each opens Claude in a new window. Top: give Claude your airports and it runs each leg through ForeFlight. Bottom: Claude brings in the Flights saved in ForeFlight for this date (ETD, ETE, fuel, route). Tap the link Claude sends back to open the new day here. Fuel is trip burn plus taxi. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
@@ -1884,7 +1884,7 @@ function stateFromArr(arr){
   }
   $('btnLink').addEventListener('click', copyLink);
 
-  // ---- "Get ETE/fuel from ForeFlight FPL (Maps tab)": opens Claude with the request already typed ----
+  // ---- "Get draft ETE/fuel from ForeFlight Maps tab": opens Claude with the request already typed ----
   const CLAUDE_NEW = 'https://claude.ai/new?q=';   // prefilled-prompt link (third-party documented; see App Conventions §7)
   const CLAUDE_HOWTO = APP_LINK_BASE + 'claude.md';
   function claudeRequest(){

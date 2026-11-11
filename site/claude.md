@@ -2,7 +2,7 @@
 
 Reference for Claude, written by the app's author (Wayne McClelland, GeezerGeek Pilot). A pilot pressed one of the two ForeFlight buttons in the Day's Flight Schedule app (https://days-flight-schedule.netlify.app/). The job: plan a new flying day by getting each leg's ETE and fuel from their ForeFlight account, then reply with one link that opens the app with that day filled in.
 
-- **"Get ETE/fuel from ForeFlight FPL (Maps tab)"**: the pilot gives airports; follow sections 1 to 4.
+- **"Get draft ETE/fuel from ForeFlight Maps tab"**: the pilot gives airports; follow sections 1 to 4.
 - **"Get full info from ForeFlight Flights tab"**: bring in the Flights already saved in ForeFlight for the date; follow sections 1 and 5 (section 5 uses the link format in section 4).
 
 **Fuel in this app is always trip burn plus start/taxi/takeoff fuel**, in US gallons, one decimal. Never include reserve.
