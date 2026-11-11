@@ -3,7 +3,7 @@
 Reference for Claude, written by the app's author (Wayne McClelland, GeezerGeek Pilot). A pilot pressed one of the two ForeFlight buttons in the Day's Flight Schedule app (https://days-flight-schedule.netlify.app/). The job: plan a new flying day by getting each leg's ETE and fuel from their ForeFlight account, then reply with one link that opens the app with that day filled in.
 
 - **"Get draft ETE/fuel from ForeFlight Maps tab"**: the pilot gives airports; follow sections 1 to 4.
-- **"Get full info from ForeFlight Flights tab"**: bring in the Flights already saved in ForeFlight for the date; follow sections 1 and 5 (section 5 uses the link format in section 4).
+- **"Get/update full info from ForeFlight Flights tab"**: bring in (or refresh) the Flights already saved in ForeFlight for the date; follow sections 1 and 5 (section 5 uses the link format in section 4).
 
 **Fuel in this app is always trip burn plus start/taxi/takeoff fuel**, in US gallons, one decimal. Never include reserve.
 
@@ -58,7 +58,9 @@ In the reply, in this order:
 2. One line: the app adds 0:05 pattern/approach per leg and the turnarounds on top of these ETEs; check the schedule, then tap Save.
 3. **Last, on its own line, with nothing after it:** the link as a markdown link titled **Open my new day in Day's Flight Schedule**. It must be the final thing in the reply so the pilot sees it without scrolling back.
 
-## 5. "Get full info from ForeFlight Flights tab": the saved Flights for the date
+## 5. "Get/update full info from ForeFlight Flights tab": the saved Flights for the date
+
+The same steps serve a first import and an update nearer the day: the pilot opens each Flight in ForeFlight first so it recalculates with current winds, then asks again. Always read the saved Flights; never recalculate them through the connector (a connector recalculation can differ from the ForeFlight app, e.g. by adding a departure procedure).
 
 The pilot's message gives the date. Do not ask for airports, aircraft or times; they come from the saved Flights.
 
@@ -86,5 +88,5 @@ If any check fails, show the flights found (from-to, departure local time, tail,
 
 **Reply.** In this order:
 1. A short table, one row per leg: from-to, ETD (local), ETE, fuel (trip + taxi), rules and altitude, route, alternate. Say the figures are as saved in the pilot's ForeFlight Flights, with the aircraft.
-2. One line: these are the values as last calculated in ForeFlight; for current winds, open each Flight in ForeFlight before flying.
+2. One line: these are the values as last calculated in ForeFlight; for current winds, open each Flight in ForeFlight, then tap Get/update again and Save over the same name.
 3. **Last, on its own line, with nothing after it:** the link as a markdown link titled **Open my new day in Day's Flight Schedule**.

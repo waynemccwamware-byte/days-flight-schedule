@@ -461,7 +461,7 @@
 
   <div class="title-row">
     <h1>Day's Flight Schedule</h1>
-    <span class="ver mono">v6.6</span>
+    <span class="ver mono">v6.7</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
 
@@ -495,9 +495,9 @@
         <div class="ffbox">
           <div class="ffbtns">
             <button class="btn" id="btnClaudeFF" type="button">Get draft ETE/fuel from ForeFlight <strong>Maps tab</strong></button>
-            <button class="btn" id="btnClaudeFlights" type="button">Get full info from ForeFlight <strong>Flights tab</strong></button>
+            <button class="btn" id="btnClaudeFlights" type="button">Get/update full info from ForeFlight <strong>Flights tab</strong></button>
           </div>
-          <p class="hint ffhint">Each opens Claude in a new window. Top: give Claude your airports and it runs each leg through ForeFlight. Bottom: Claude brings in the Flights saved in ForeFlight for this date (ETD, ETE, fuel, route). Tap the link Claude sends back to open the new day here. Fuel is trip burn plus taxi. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
+          <p class="hint ffhint">Each opens Claude in a new window. Top: give Claude your airports and it runs each leg through ForeFlight. Bottom: Claude brings in the Flights saved in ForeFlight for this date (ETD, ETE, fuel, route), as last calculated in ForeFlight. To update them nearer the day, open each Flight in ForeFlight first so it recalculates with current winds, then tap again and Save over the same name. Tap the link Claude sends back to open the new day here. Fuel is trip burn plus taxi. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
         </div>
       </div>
     </section>
@@ -1903,7 +1903,7 @@ function stateFromArr(arr){
       'Wheels Up 1: ' + lastWheelsUp() + ' (24-hour, local at the first airport) unless I give another time.'
     ].join('\n');
   }
-  // ---- "Get full info from ForeFlight Flights tab" (V6.4): Claude brings in the saved Flights for the app's date ----
+  // ---- "Get/update full info from ForeFlight Flights tab" (V6.4; "update" wording V6.7): Claude brings in the saved Flights for the app's date ----
   function claudeRequestFlights(){
     return [
       'Please use my ForeFlight Mobile connector to bring the Flights I saved in ForeFlight for ' + fmtDay(state.date) + ' (' + state.date + ') into my Day\'s Flight Schedule app.',
