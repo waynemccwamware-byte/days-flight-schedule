@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Flight Day">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-deep:#10141a;
@@ -243,6 +243,7 @@
   }
   .btn:hover{ color:var(--amber); border-color:var(--amber); }
   .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  .btn strong{ font-weight:700; }
   .btn.primary{ color:var(--amber); border-color:var(--amber-dim); background:rgba(245,166,35,0.08); }
   #msg{ min-height:16px; margin-top:10px; font-size:12px; color:var(--teal); }
 
@@ -460,7 +461,7 @@
 
   <div class="title-row">
     <h1>Day's Flight Schedule</h1>
-    <span class="ver mono">v6.5</span>
+    <span class="ver mono">v6.6</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Plan a flying day of up to five legs. Pick the time you want to plan around (wheels up, an arrival, or leaving home) and enter it, then each leg's airports, ETE and fuel. The schedule works out every clock time, from leaving home to arriving final destination.</p>
 
@@ -493,8 +494,8 @@
         <p class="hint">The time you plan around is the one you type in (marked <span class="tag" style="margin:0">start here</span>); every other time works out from it. Switching doesn't move the schedule.</p>
         <div class="ffbox">
           <div class="ffbtns">
-            <button class="btn" id="btnClaudeFF" type="button">Get draft ETE/fuel from ForeFlight Maps tab</button>
-            <button class="btn" id="btnClaudeFlights" type="button">Get full info from ForeFlight Flights tab</button>
+            <button class="btn" id="btnClaudeFF" type="button">Get draft ETE/fuel from ForeFlight <strong>Maps tab</strong></button>
+            <button class="btn" id="btnClaudeFlights" type="button">Get full info from ForeFlight <strong>Flights tab</strong></button>
           </div>
           <p class="hint ffhint">Each opens Claude in a new window. Top: give Claude your airports and it runs each leg through ForeFlight. Bottom: Claude brings in the Flights saved in ForeFlight for this date (ETD, ETE, fuel, route). Tap the link Claude sends back to open the new day here. Fuel is trip burn plus taxi. Needs a Claude account and the <a href="https://claude.ai/customize/connectors/id/foreflight-mobile?q=foreflight" target="_blank" rel="noopener">ForeFlight Mobile connector</a> (any individual ForeFlight plan: Starter, Essential or Premium).</p>
         </div>
